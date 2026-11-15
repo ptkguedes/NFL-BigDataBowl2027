@@ -1,6 +1,17 @@
 __pycache__/
 *.py[cod]
 .venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+outputs/
+
+# Competition files and external ratings stay off the remote.
 data/
+external/
+madden/
 submission.csv
 *.csv
+!tests/fixtures/*.csv

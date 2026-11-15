@@ -1,0 +1,3 @@
+nfl_id,display_name,draft_year,nfl_position,extra_column
+900001,Synthetic TE,2023,TE,ignore-me
+900002,Synthetic CB,2023,CB,ignore-me

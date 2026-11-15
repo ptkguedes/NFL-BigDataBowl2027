@@ -1,2 +1,2 @@
-numpy
-pandas
+numpy>=1.26
+pandas>=2.1
