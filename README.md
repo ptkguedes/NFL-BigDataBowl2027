@@ -9,11 +9,24 @@ This repository studies two pre-registered questions:
 - **Tight ends.** Do Combine explosiveness and deceleration measures (10-yard split, 3-cone, and TE position-drill braking from 10 Hz tracking) line up with in-game route separation and target outcomes?
 - **Defensive backs.** Does the quality of the backpedal-to-break transition (`BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION`) line up with separation allowed, completions allowed, and EPA allowed?
 
+## Current lead (to validate)
+
+On the 2023-2025 draft classes, after the dated amendments A1-A6 (2026-11-15), the DB thesis is **speed retention through the backpedal break goes with lower EPA allowed**. The within-class correlation is r = -0.60 (95% interval -0.81 to -0.25, p = 0.002, n = 26), and it holds without the 2024 class (r = -0.65, n = 15). It is a secondary test that only appeared after the amendments, so it is a lead to validate, not a result. Robustness checks are in `docs/WRITEUP_DRAFT.md` (Table 2). Time to the break shows no link to separation allowed. DBs with no break by 5.5 s allowed fewer completions, possibly because they align deeper, which is untested. The tight-end tests are weak.
+
+Scenario view, from a bootstrap posterior with a flat prior and 90% bands:
+- A rookie DB at the within-class 75th percentile of retention beats his class median EPA allowed per target with probability 0.68 (0.56-0.84). One at the 25th percentile does so with probability 0.34.
+- The high-minus-low gap is -0.32 EPA per target, or -19 EPA over an assumed 60-target season. Treat that as an upper bound that should shrink on new data.
+- The gap is stronger in man coverage than in zone.
+
+The cushion check gives only weak support to the idea that slow breakers align deeper.
+
+Run `python -m bdb2027 --data-dir data --robustness --scenarios` to also write `<output>_robustness.csv`, `<output>_scenarios.csv` and `<output>_cushion.csv`. These hold aggregate statistics only. The notebook draws Figures 1 and 2 at runtime with `bdb2027.figures`, and no images are committed. Plotting needs `matplotlib`, which is in `requirements-dev.txt`.
+
 Comparisons are **within draft class**. The code reports a pooled within-class Pearson correlation, a 95% Fisher interval, the class counts, and a Bonferroni threshold for the six-test family. Sample sizes around a position group are small; the result table marks `small_n` when fewer than 20 players enter a test.
 
 ## Rules
 
-`docs/RULES_CHECKLIST.md` records what was checked against the Kaggle competition pages, the Kaggle competition record, and the NFL Football Operations Big Data Bowl page, including items that could not be verified. `docs/WRITEUP_DRAFT.md` is an outline for the write-up, not the submission itself.
+`docs/RULES_CHECKLIST.md` records what was checked against the Kaggle competition pages, the Kaggle competition record, and the NFL Football Operations Big Data Bowl page, including items that could not be verified. `docs/WRITEUP_DRAFT.md` holds the draft submission text between markers (checked by `tests/test_writeup.py` for at most 2,000 words and fewer than 10 tables and figures) and author notes that are not submitted.
 
 ## Data
 
