@@ -151,7 +151,20 @@ def write_synthetic_competition(data_dir: Path) -> None:
             complete = slot == 2
             epa = float(slot)
             plays.append(
-                _play(play_id, receiver, "WR", complete=complete, separation=9.0, epa=epa)
+                _play(play_id, receiver, "WR", complete=complete, separation=separation, epa=epa)
+            )
+            plays.append(
+                _play(
+                    play_id,
+                    nfl_id,
+                    "CB",
+                    complete=complete,
+                    separation=float("nan"),
+                    epa=epa,
+                    target=False,
+                    team_abbr="DEF",
+                    coverage_assignment="MAN",
+                )
             )
             db_plays.append((play_id, nfl_id, separation, complete, epa))
             play_id += 1
@@ -204,17 +217,23 @@ def _play(
     complete: bool,
     separation: float,
     epa: float,
+    target: bool = True,
+    team_abbr: str = "OFF",
+    coverage_assignment: str | None = None,
+    game_id: int = 2023090700,
 ) -> dict[str, object]:
     return {
-        "game_id": 2023090700,
+        "game_id": game_id,
         "play_id": play_id,
         "nfl_id": nfl_id,
         "lined_up_position": position,
         "pass_result": "C" if complete else "I",
         "play_nullified_by_penalty": "N",
-        "target": True,
+        "target": target,
         "expected_points_added": epa,
         "separation_at_pass_forward": separation,
+        "team_abbr": team_abbr,
+        "coverage_assignment": coverage_assignment,
     }
 
 
@@ -246,6 +265,56 @@ def test_pipeline_reports_within_class_effects(tmp_path: Path) -> None:
     assert "FORTY_YARD_DASH" not in set(result["attempts"]["drill_type"])
     assert result["external"]["status"] == "skipped"
     assert result["n_games"] == 1
+    three_cone = effects.loc[effects["test_id"].eq("te_secondary_three_cone_completion")].iloc[0]
+    assert bool(three_cone["underpowered"]) is True
+    assert int(effects["underpowered"].sum()) == 1
+    methods = dict(zip(effects["test_id"], effects["method"], strict=True))
+    assert methods["db_primary_break_separation"] == "spearman"
+    assert methods["db_secondary_break_completion"] == "spearman"
+    assert methods["db_secondary_retention_epa"] == "pearson"
+    assert methods["te_primary_decel_separation"] == "pearson"
+    assert effects["p_value"].between(0, 1).all()
+
+
+def test_preseason_targets_are_dropped(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    write_synthetic_competition(data_dir)
+    plays = pd.read_csv(data_dir / "player_play.csv")
+    extra = pd.DataFrame(
+        [
+            _play(
+                9000 + index,
+                1,
+                "TE",
+                complete=True,
+                separation=20.0,
+                epa=5.0,
+                game_id=2023081000,
+            )
+            for index in range(5)
+        ]
+    )
+    pd.concat([plays, extra], ignore_index=True).to_csv(data_dir / "player_play.csv", index=False)
+    games = pd.read_csv(data_dir / "games.csv")
+    preseason = pd.DataFrame(
+        {"game_id": [2023081000], "season": [2023], "season_type": ["PRE"], "week": [1]}
+    )
+    pd.concat([games, preseason], ignore_index=True).to_csv(data_dir / "games.csv", index=False)
+
+    regular = run_analysis(data_dir)["te_players"].set_index("nfl_id")
+    assert regular.loc[1, "n_targets"] == 5
+    assert regular.loc[1, "te_mean_separation"] == 1.0
+    pooled = run_analysis(data_dir, regular_season_only=False)["te_players"].set_index("nfl_id")
+    assert pooled.loc[1, "n_targets"] == 10
+
+
+def test_sensitivity_drops_the_2024_class(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    write_synthetic_competition(data_dir)
+    sensitivity = run_analysis(data_dir)["sensitivity"]
+    assert set(sensitivity["angle"]) == {"DB"}
+    assert len(sensitivity) == 3
+    assert set(sensitivity["class_counts"]) == {"2023:3"}
 
 
 def test_cli_missing_directory_lists_official_files(tmp_path: Path) -> None:
@@ -262,6 +331,7 @@ def test_cli_writes_effects(tmp_path: Path) -> None:
     assert code == 0
     written = pd.read_csv(output)
     assert len(written) == 6
+    assert (tmp_path / "effects_sensitivity.csv").is_file()
     assert set(OFFICIAL_FILENAMES) == {
         "players.csv",
         "combine_results.csv",

@@ -41,6 +41,85 @@ DB_POSITIONS: frozenset[str] = frozenset({"CB", "SS", "FS", "DB", "S"})
 
 FAMILY_ALPHA: float = 0.05
 
+# ---------------------------------------------------------------------------
+# Amendments dated 2026-11-15.
+#
+# These were made after the first run on the competition files, so the
+# outcome correlations under the original definitions had already been seen.
+# The write-up has to say so and report the original run next to the amended
+# one (docs/WRITEUP_DRAFT.md, "Amendments").
+#
+# A1. Outcomes use regular-season games only (games.season_type == "REG").
+#     games.csv also has PRE and POST games, and the theme is regular-season
+#     performance. Originally all game types were pooled.
+# A2. Defensive-back coverage credit. Game tracking only covers the 510
+#     draftees in players.csv (about 3 tracked players per pass_forward frame),
+#     so "nearest tracked DB to the target" was usually not the covering
+#     defender (median 12.6 yd). A draftee DB is now credited with a target
+#     when all of these hold on that play:
+#       - the targeted receiver is a tracked draftee (target is true);
+#       - the DB is on the other team and has an active coverage_assignment
+#         (not missing and not in INACTIVE_COVERAGE_ASSIGNMENTS);
+#       - at pass_forward he is the closest such DB to the target and within
+#         COVERAGE_RADIUS_YDS.
+#     Separation allowed is the receiver's published separation_at_pass_forward
+#     (nearest defender of any kind), not the receiver-to-DB distance.
+#     Undrafted or veteran defenders and non-draftee targets are invisible,
+#     so a credited DB is "an assigned draftee DB in the area", not a charted
+#     primary defender. The 5 yd radius was picked after counting credited
+#     targets per radius (3/5/7/10 yd), before any outcome correlation was
+#     computed under this definition.
+# A3. Break detection is capped at MAX_BREAK_TIME_S after the first frame of
+#     the attempt, in every draft class. 2024 backpedal attempts end at about
+#     5.3-6.6 s (2023 about 11.7 s, 2025 about 10.2 s), so later breaks could
+#     only be found outside 2024. The DB tests are also reported without the
+#     SENSITIVITY_DROP_CLASS class.
+# A4. The Fisher interval uses n - 3 - (k - 1) degrees of freedom for k draft
+#     classes. Removing k class means costs k - 1 more than an ordinary
+#     Pearson correlation, which already removes one mean.
+# A5. te_secondary_three_cone_completion is flagged underpowered. It stays in
+#     the family and in the Bonferroni count.
+AMENDMENT_DATE: str = "2026-11-15"
+REGULAR_SEASON_ONLY: bool = True
+REGULAR_SEASON_TYPE: str = "REG"
+COVERAGE_RADIUS_YDS: float = 5.0
+INACTIVE_COVERAGE_ASSIGNMENTS: frozenset[str] = frozenset({"NO_ASSIGNMENT"})
+MAX_BREAK_TIME_S: float = 5.5
+SENSITIVITY_DROP_CLASS: int = 2024
+UNDERPOWERED_TESTS: frozenset[str] = frozenset({"te_secondary_three_cone_completion"})
+
+# ---------------------------------------------------------------------------
+# Amendment A6, dated 2026-11-15 (supersedes the "drop" part of A3).
+#
+# A3 dropped every backpedal attempt with no break in the first
+# MAX_BREAK_TIME_S, which kept a break time for only 70 of 241 attempts.
+# A6 keeps them:
+#   - An attempt where the athlete started moving, no break was found within
+#     MAX_BREAK_TIME_S, and the recording lasted at least
+#     MIN_CENSOR_DURATION_S, is right-censored: time_to_break_s is set to
+#     MAX_BREAK_TIME_S and break_censored is 1. Every detected break is at or
+#     under MAX_BREAK_TIME_S, so a censored attempt ranks as the slowest.
+#     Shorter recordings with no break stay missing, because "no break yet"
+#     is not informative there.
+#   - The player value is still the median over attempts. A player whose
+#     median is MAX_BREAK_TIME_S is flagged db_break_censored.
+#   - The two DB break-time tests use a rank method (RANK_TESTS): ranks inside
+#     each draft class (average ranks for ties, so all censored players tie at
+#     the slowest rank), demeaned inside the class, then Pearson on the
+#     deviations, which is a pooled within-class Spearman correlation. The
+#     Fisher interval for those rows uses the Fieller-Hartley-Pearson
+#     variance 1.06 / (n - 3 - (k - 1)).
+#   - Speed retention is defined at the break, so censored attempts have no
+#     retention value. db_secondary_retention_epa keeps only attempts with a
+#     detected break and stays a Pearson test.
+#   - Scouting reading: the ordering among detected breakers is the signal.
+#     Players at or past MAX_BREAK_TIME_S are context, not a ranked group.
+MIN_CENSOR_DURATION_S: float = 5.0
+SPEARMAN_VARIANCE_FACTOR: float = 1.06
+RANK_TESTS: frozenset[str] = frozenset(
+    {"db_primary_break_separation", "db_secondary_break_completion"}
+)
+
 
 @dataclass(frozen=True)
 class PreRegisteredTest:

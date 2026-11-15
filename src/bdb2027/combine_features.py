@@ -17,7 +17,9 @@ from bdb2027.preregistration import (
     DB_BACKPEDAL_DRILL_NAME,
     FALLBACK_DT_SECONDS,
     INITIAL_HEADING_FRAMES,
+    MAX_BREAK_TIME_S,
     MIN_ATTEMPT_FRAMES,
+    MIN_CENSOR_DURATION_S,
     RETENTION_WINDOW_SECONDS,
     START_SPEED_YPS,
     TE_SKILL_DRILL_TYPE,
@@ -43,6 +45,7 @@ FEATURE_COLUMNS: tuple[str, ...] = (
     "speed_before_break",
     "speed_after_break",
     "speed_retention",
+    "break_censored",
 )
 
 
@@ -66,8 +69,18 @@ def features_for_attempt(
     retention_window_s: float = RETENTION_WINDOW_SECONDS,
     initial_heading_frames: int = INITIAL_HEADING_FRAMES,
     min_frames: int = MIN_ATTEMPT_FRAMES,
+    max_break_time_s: float | None = MAX_BREAK_TIME_S,
+    min_censor_duration_s: float = MIN_CENSOR_DURATION_S,
 ) -> dict[str, float]:
-    """Kinematic summary for one drill attempt, already sorted by time."""
+    """Kinematic summary for one drill attempt, already sorted by time.
+
+    A break is only searched for within `max_break_time_s` of the attempt's
+    first frame (amendment A3). `None` turns the cap off. With the cap on, a
+    moving attempt with no break in the window that was recorded for at least
+    `min_censor_duration_s` is censored at the cap (amendment A6):
+    `time_to_break_s` is the cap and `break_censored` is 1. Speed before and
+    after the break, and retention, stay missing for censored attempts.
+    """
     empty = {
         "n_frames": float(len(times_s)),
         "accel_peak": np.nan,
@@ -77,6 +90,7 @@ def features_for_attempt(
         "speed_before_break": np.nan,
         "speed_after_break": np.nan,
         "speed_retention": np.nan,
+        "break_censored": np.nan,
     }
     if len(times_s) < min_frames:
         return empty
@@ -104,9 +118,20 @@ def features_for_attempt(
     origin = circular_mean_deg(heading_slice)
     delta = heading_delta_deg(direction, origin)
     after_start = np.arange(len(delta)) >= start_index
-    break_candidates = np.flatnonzero((delta >= break_heading_deg) & after_start)
+    in_window = np.ones(len(delta), dtype=bool)
+    if max_break_time_s is not None:
+        elapsed = np.asarray(times_s, dtype=float) - float(np.nanmin(times_s))
+        in_window = elapsed <= max_break_time_s + 1e-9
+    break_candidates = np.flatnonzero((delta >= break_heading_deg) & after_start & in_window)
     if break_candidates.size == 0:
+        if max_break_time_s is not None:
+            duration = float(np.nanmax(times_s) - np.nanmin(times_s))
+            if duration >= min_censor_duration_s - 1e-9:
+                empty["time_to_break_s"] = float(max_break_time_s)
+                empty["break_censored"] = 1.0
         return empty
+
+    empty["break_censored"] = 0.0
 
     break_index = int(break_candidates[0])
     break_time = float(times_s[break_index])
@@ -202,6 +227,8 @@ def predictor_table(attempts: pd.DataFrame, combine_results: pd.DataFrame) -> pd
             "decel_magnitude": "db_decel_magnitude",
         },
     )
+    if not db.empty:
+        db["db_break_censored"] = db["db_break_time_s"] >= MAX_BREAK_TIME_S - 1e-9
     stopwatch_cols = [
         "nfl_id",
         "draft_year",

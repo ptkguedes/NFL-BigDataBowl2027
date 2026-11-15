@@ -31,7 +31,7 @@ Place the files in `data/` locally, or let a Kaggle notebook read them from `/ka
 - `game_tracking_2024.csv`
 - `game_tracking_2025.csv`
 
-A check of a WSL copy at `/home/patrickengdev/nfl-big-data-bowl/data` on `batyoga` was not done, because that machine was offline. This repository does not say whether those files are on that machine.
+The files were checked in a local WSL `data/` directory on 2026-11-15. `data/` is gitignored.
 
 ## Optional external ratings
 
@@ -85,9 +85,12 @@ CI runs the same two commands on Python 3.12. Tests build small synthetic tables
 
 ## Method notes that affect the numbers
 
-- Deceleration is the drop in speed per second. The data page does not say that column `a` is signed, so `a` is not used as a signed brake.
+- Deceleration is the drop in speed per second. Column `a` is never negative in the files, so it is not used as a signed brake.
 - A "break" is not an official event on Combine tracking. It is the first frame, after the athlete is moving, where heading has changed by 45 degrees from the opening heading. The threshold is pre-registered in `src/bdb2027/preregistration.py`.
 - Tight-end separation is `separation_at_pass_forward` on targeted plays with `lined_up_position` TE.
-- Defensive-back separation allowed is the distance from the targeted receiver to the nearest pre-registered DB at the `pass_forward` frame. Completions allowed and EPA allowed are taken from that same play. Those three are analysis definitions, not published defender columns.
+- Outcomes use regular-season games only (amendment A1, 2026-11-15).
+- Game tracking covers only the 510 draftees. A draftee DB is credited with a target when the targeted receiver is a tracked draftee and the DB is the closest opposing DB with an active `coverage_assignment` within 5 yards at `pass_forward` (amendment A2). Separation allowed is the receiver's `separation_at_pass_forward`. Completions allowed and EPA allowed come from that play. These are analysis definitions, not published defender columns.
+- Breaks are searched for only in the first 5.5 s of each attempt, because 2024 backpedal attempts are cut at about 6 s (amendment A3). Attempts with no break by then are censored at 5.5 s, and the two DB break-time tests use a within-class Spearman correlation (amendment A6). Speed retention exists only for detected breaks. The CLI also writes `<output>_sensitivity.csv` with the DB tests without the 2024 class.
+- Fisher intervals use `n - 3 - (k - 1)` degrees of freedom for `k` draft classes (A4). The TE 3-cone test is flagged `underpowered` (A5).
 - Plays with `play_nullified_by_penalty` equal to `Y` are dropped.
 - Draft class is `draft_year`. Predictors and outcomes are demeaned inside the class before the correlation.

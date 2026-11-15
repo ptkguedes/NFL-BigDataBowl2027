@@ -20,11 +20,18 @@ from bdb2027.io import (
 )
 from bdb2027.linkage import evaluate_tests
 from bdb2027.outcomes import (
+    coverage_defender_on_targets,
     defensive_back_outcomes,
-    nearest_defender_on_targets,
     tight_end_outcomes,
 )
-from bdb2027.preregistration import MIN_DB_TARGETS_COVERED, MIN_TE_TARGETS
+from bdb2027.preregistration import (
+    MIN_DB_TARGETS_COVERED,
+    MIN_TE_TARGETS,
+    PREREGISTERED_TESTS,
+    REGULAR_SEASON_ONLY,
+    REGULAR_SEASON_TYPE,
+    SENSITIVITY_DROP_CLASS,
+)
 
 
 def _without_year(frame: pd.DataFrame) -> pd.DataFrame:
@@ -41,6 +48,7 @@ def run_analysis(
     min_te_targets: int = MIN_TE_TARGETS,
     min_db_targets_covered: int = MIN_DB_TARGETS_COVERED,
     chunksize: int = 250_000,
+    regular_season_only: bool = REGULAR_SEASON_ONLY,
 ) -> dict[str, object]:
     """Run the pre-registered TE and DB analyses.
 
@@ -56,9 +64,16 @@ def run_analysis(
     attempts = movement_features(tracking)
     predictors = predictor_table(attempts, combine_results)
     player_play = load_player_play(data_dir, chunksize=chunksize)
+    pass_forward = load_pass_forward_tracking(data_dir, chunksize=chunksize)
+    if regular_season_only:
+        # Amendment A1: games.csv also has PRE and POST games.
+        season_type = games["season_type"].astype("string").str.upper()
+        reg_ids = set(games.loc[season_type.eq(REGULAR_SEASON_TYPE), "game_id"].tolist())
+        player_play = player_play.loc[player_play["game_id"].isin(reg_ids)]
+        pass_forward = pass_forward.loc[pass_forward["game_id"].isin(reg_ids)]
     te_outcomes = tight_end_outcomes(player_play, players, min_targets=min_te_targets)
-    assignments = nearest_defender_on_targets(
-        load_pass_forward_tracking(data_dir, chunksize=chunksize),
+    assignments = coverage_defender_on_targets(
+        pass_forward,
         player_play,
         players,
     )
@@ -70,6 +85,11 @@ def run_analysis(
     te_frame = predictors.merge(_without_year(te_outcomes), on="nfl_id", how="inner")
     db_frame = predictors.merge(_without_year(db_outcomes), on="nfl_id", how="inner")
     effects = evaluate_tests({"TE": te_frame, "DB": db_frame})
+    # Amendment A3 sensitivity check: DB tests without the truncated 2024 class.
+    db_tests = tuple(test for test in PREREGISTERED_TESTS if test.angle == "DB")
+    db_without_class = db_frame.loc[db_frame["draft_year"] != SENSITIVITY_DROP_CLASS]
+    sensitivity = evaluate_tests({"DB": db_without_class}, tests=db_tests)
+    sensitivity.insert(0, "sensitivity", f"drop_draft_year_{SENSITIVITY_DROP_CLASS}")
     external = external_benchmark_step(
         predictors,
         players,
@@ -78,6 +98,7 @@ def run_analysis(
     )
     return {
         "effects": effects,
+        "sensitivity": sensitivity,
         "te_players": te_frame,
         "db_players": db_frame,
         "attempts": attempts,
@@ -99,10 +120,14 @@ def effects_summary(effects: pd.DataFrame) -> str:
             "role",
             "n_players",
             "n_classes",
+            "method",
             "pearson_r",
             "ci_low",
             "ci_high",
+            "p_value",
+            "n_censored",
             "small_n",
+            "underpowered",
             "class_counts",
         ],
     ]
