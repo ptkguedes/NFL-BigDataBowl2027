@@ -121,6 +121,28 @@ def bootstrap_interval(
     }
 
 
+def coverage_frames(
+    assignments: pd.DataFrame,
+    db_players: pd.DataFrame,
+    players: pd.DataFrame,
+    *,
+    min_targets_covered: int = SPLIT_MIN_TARGETS,
+    predictor: str = PREDICTOR,
+) -> dict[str, pd.DataFrame]:
+    """Per-DB outcomes rebuilt from man-only and zone-only credited targets."""
+    if assignments.empty or "coverage_assignment" not in assignments.columns:
+        return {}
+    retention = db_players.loc[:, ["nfl_id", "draft_year", predictor]].drop_duplicates("nfl_id")
+    is_man = assignments["coverage_assignment"].astype("string").eq(MAN_ASSIGNMENT).fillna(False)
+    frames = {}
+    for label, subset in (("man", assignments.loc[is_man]), ("zone", assignments.loc[~is_man])):
+        outcomes = defensive_back_outcomes(subset, players, min_targets_covered=min_targets_covered)
+        frames[label] = retention.merge(
+            outcomes.drop(columns=["draft_year"]), on="nfl_id", how="inner"
+        )
+    return frames
+
+
 def coverage_split(
     assignments: pd.DataFrame,
     db_players: pd.DataFrame,

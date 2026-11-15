@@ -1,6 +1,6 @@
 # Write-up draft
 
-This file has two parts. Part A, between the `SUBMISSION START` and `SUBMISSION END` markers, is the draft text for the Kaggle write-up. `tests/test_writeup.py` checks that it stays at or under 2,000 words and under 10 tables and figures. Part B is author notes, which are not submitted. Numbers come from the local run of `python -m bdb2027 --data-dir data --robustness` on the competition files (amendments A1-A6, 2026-11-15). Re-run before submitting and update every number.
+This file has two parts. Part A, between the `SUBMISSION START` and `SUBMISSION END` markers, is the draft text for the Kaggle write-up. `tests/test_writeup.py` checks that it stays at or under 2,000 words and under 10 tables and figures. Part B is author notes, which are not submitted. Numbers come from the local run of `python -m bdb2027 --data-dir data --robustness --scenarios` on the competition files (amendments A1-A6, 2026-11-15). Re-run before submitting and update every number.
 
 Track to select at submission: Open or University. University only if every member is an undergraduate. Leave the Grand Prize track empty unless that changes.
 
@@ -66,11 +66,27 @@ Rookie DBs who came out of the break closer to their entry speed gave up less EP
 
 The sign never flips, and no single player drives it. The weak points are just as clear. Dropping 2025 or raising the target floor widens the interval across zero. Most of the association sits in man coverage, where the credited DB is most likely the real coverage defender and where carrying speed through a break should matter most. That is a reading, not a test.
 
+## Probabilities and scenarios
+
+To make the lead concrete, we resampled players within each class 4,000 times. That gives a bootstrap approximation to a posterior with a flat prior. In each draw we fitted the within-class slope of EPA allowed per target on retention. We then compared two profiles taken from the observed data: a DB at the 75th percentile of within-class retention (raw retention about 1.10) and one at the 25th percentile (about 1.04). A "season" assumes 60 targets in coverage, roughly a full-time starter. That volume is an assumption, not a count from these files, which only credit draftee-on-draftee targets (median 5 per DB-season). Bands are 90%.
+
+**Table 3. Retention scenarios (bootstrap posterior, 90% bands).**
+
+| Quantity | All targets (n 26) | Man only (n 22) | Zone only (n 23) |
+| --- | --- | --- | --- |
+| P(slope below zero) | 1.00 | 1.00 | 0.92 |
+| P(75th-percentile DB allows less EPA/target than his class median) | 0.68 (0.56-0.84) | 0.69 (0.54-0.85) | 0.58 (0.44-0.75) |
+| P(25th-percentile DB allows less EPA/target than his class median) | 0.34 (0.16-0.48) | 0.25 (0.09-0.43) | 0.43 (0.31-0.55) |
+| EPA/target, high minus low retention | -0.32 (-0.49 to -0.18) | -0.59 (-0.95 to -0.22) | -0.18 (-0.44 to 0.02) |
+| EPA per 60-target season, high minus low | -19 (-29 to -11) | -36 (-57 to -13) | -11 (-26 to 1) |
+
+Read the probabilities rather than the season totals. A high-retention rookie beats his class median about two times in three, and a low-retention rookie about one time in three. The season-scale gap is large by NFL standards, and it is almost certainly an upper bound. Per-DB EPA means rest on about 15 credited targets each, nothing is shrunk, and the lead was found after amendments, so the effect should be expected to shrink on new players. At the observed credited volume the gap is -1.6 EPA per season (-2.4 to -0.9).
+
 ## Defensive backs: time to the break
 
 Quicker breaks do not go with less separation allowed (Spearman -0.02). They also do not go with fewer completions allowed. That row has the opposite sign to what we expected (0.22, interval -0.09 to 0.49).
 
-For scouting, the ordering that matters is among players who broke inside 5.5 seconds. The drill cannot separate the rest from each other, so we treat them as context. In the break tests, 21 of 47 DBs had a median attempt with no break by 5.5 seconds. Those slow breakers allowed a 52.6% completion rate on credited targets, against 61.0% for the 26 faster breakers, with similar separation (2.46 against 2.39 yards). One possible reading is that slow breakers line up deeper or play off, so the throws credited to them are harder ones. We have not tested that. Alignment depth (`cushion`) is the next check.
+For scouting, the ordering that matters is among players who broke inside 5.5 seconds. The drill cannot separate the rest from each other, so we treat them as context. In the break tests, 21 of 47 DBs had a median attempt with no break by 5.5 seconds. Those slow breakers allowed a 52.6% completion rate on credited targets, against 61.0% for the 26 faster breakers, with similar separation (2.46 against 2.39 yards). One possible reading was that slow breakers line up deeper, so the throws credited to them are harder ones. Pre-snap `cushion` gives only weak support. Within class, slow breakers lined up 0.57 yards deeper on credited targets (6.2 against 5.6 yards, permutation p = 0.18) and 0.45 yards deeper over all snaps (p = 0.27). The group also has more safeties (38% against 23%, p = 0.35). Depth may contribute, but it does not explain the completion gap, and we make no claim that it does.
 
 **Figure 2.** 95% intervals for all six family tests and the Table 2 checks, in one forest plot.
 
@@ -91,7 +107,7 @@ If speed retention through a backpedal break holds in new draft classes, it is c
 
 ## Reproducibility
 
-The public Kaggle notebook calls `bdb2027.pipeline.run_analysis` on `/kaggle/input/nfl-big-data-bowl-2027/` and rebuilds Tables 1-2 and Figures 1-2. All definitions and dated amendments are in `src/bdb2027/preregistration.py`.
+The public Kaggle notebook calls `bdb2027.pipeline.run_analysis` on `/kaggle/input/nfl-big-data-bowl-2027/` and rebuilds Tables 1-3 and Figures 1-2 at runtime. All definitions and dated amendments are in `src/bdb2027/preregistration.py`.
 
 <!-- SUBMISSION END -->
 
@@ -99,17 +115,17 @@ The public Kaggle notebook calls `bdb2027.pipeline.run_analysis` on `/kaggle/inp
 
 ### Rules reminders
 
-- At or under 2,000 words, fewer than 10 tables or figures, attached public notebook. Part A has 2 tables and 2 figures.
+- At or under 2,000 words, fewer than 10 tables or figures, attached public notebook. Part A has 3 tables and 2 figures.
 - The write-up has to use Combine tracking and link it to regular-season performance. Both gates rest on the backpedal drill series and regular-season `player_play` outcomes.
 - Do not attach or quote row-level competition data. Tables 1-2 are aggregates.
 - Optional external benchmark (Madden or other ratings): include it only if the source is public and free for every participant, or meets the host's Reasonableness Standard (Rules section 2.6). It is off by default (`--enable-external-benchmark`), it is not part of the family, and it would cost a figure.
 
 ### Before submitting
 
-1. Re-run with `--robustness` and replace every number in Part A.
-2. Check `cushion` (alignment depth) for slow against fast breakers before keeping the "deeper alignment" sentence.
+1. Re-run with `--robustness --scenarios` and replace every number in Part A.
+2. Cushion check done (2026-11-15): weak support only (p = 0.18 to 0.35), so Part A now reports it as "may contribute, does not explain". Drop the sentence if a re-run moves it further from significance.
 3. If a later class or holdout becomes available, test retention -> EPA there first. That is the validation this lead needs.
-4. Make Figure 1 and Figure 2 in the notebook. Do not add a chart that does not change the claim.
+4. Figures 1 and 2 are drawn at runtime by `bdb2027.figures` in the notebook. Do not commit exported images. Figure 1 has one point per player. Do not add a chart that does not change the claim.
 
 ### Amendments and results history
 
