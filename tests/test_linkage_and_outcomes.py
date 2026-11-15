@@ -88,6 +88,40 @@ def test_fisher_interval_spends_class_means() -> None:
     assert stats["ci_high"] == pytest.approx(math.tanh(math.atanh(r) + 1.96 * se))
 
 
+def test_spearman_ties_censored_players_at_the_slowest_rank() -> None:
+    # Within each class, censored players (time 5.5) tie at the slowest rank.
+    frame = pd.DataFrame(
+        {
+            "draft_year": [2023] * 5 + [2024] * 5,
+            "db_break_time_s": [3.0, 4.0, 4.5, 5.5, 5.5, 3.5, 4.0, 5.0, 5.5, 5.5],
+            "sep": [1.0, 1.5, 2.0, 9.0, 3.0, 2.0, 2.5, 2.6, 30.0, 4.0],
+            "db_break_censored": [False, False, False, True, True] * 2,
+        }
+    )
+    rank = within_class_pearson(
+        frame,
+        "db_break_time_s",
+        "sep",
+        method="spearman",
+        censored_col="db_break_censored",
+    )
+    linear = within_class_pearson(frame, "db_break_time_s", "sep")
+    assert rank["method"] == "spearman"
+    assert rank["n_censored"] == 4
+    assert rank["n_players"] == 10
+    # The rank method is not driven by the 30-yard outlier.
+    x = np.array([1, 2, 3, 4.5, 4.5] * 2) - 3.0
+    y = np.array([1, 2, 3, 5, 4] * 2) - 3.0
+    assert rank["pearson_r"] == pytest.approx(float(np.corrcoef(x, y)[0, 1]))
+    assert rank["pearson_r"] > linear["pearson_r"]
+    se = math.sqrt(1.06 / (10 - 3 - 1))
+    r = rank["pearson_r"]
+    assert rank["ci_high"] == pytest.approx(math.tanh(math.atanh(r) + 1.96 * se))
+    assert 0 < rank["p_value"] < 0.05
+    with pytest.raises(ValueError):
+        within_class_pearson(frame, "db_break_time_s", "sep", method="kendall")
+
+
 def _coverage_case() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     players = pd.DataFrame(
         {

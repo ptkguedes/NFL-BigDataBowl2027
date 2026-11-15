@@ -207,7 +207,7 @@ These are project choices, fixed in `src/bdb2027/preregistration.py` before any 
 - Within-`draft_year` demeaning, then Pearson correlation. Effect size is that correlation. The interval is a Fisher z interval that treats players as independent after demeaning. It is not cluster-robust, and estimating class means uses degrees of freedom the interval does not remove.
 - A draft class is included only when it has at least three players with both values. `small_n` is true when the pooled player count is under 20.
 - TE inclusion floor: at least five targeted plays. DB inclusion floor: at least five credited targets (amendment A2). The planning notes of about 18 tight ends and about 62 defensive backs with enough snaps are **not** measured sample sizes.
-- Break threshold: 45 degrees of heading change. Deceleration is computed from the change in speed, not from `a`.
+- Break threshold: 45 degrees of heading change, searched for in the first 5.5 s. Attempts with no break by then are censored at 5.5 s, and the DB break-time tests are within-class Spearman (amendments A3 and A6). Deceleration is computed from the change in speed, not from `a`.
 - DB positions treated as coverage players: `CB`, `SS`, `FS`, `DB`, `S`.
 
 ## Amendments, 2026-11-15
@@ -221,6 +221,7 @@ These were made after the first run on the competition files, so results under t
 | A3 | A break is only searched for in the first 5.5 s of each drill attempt, in every class. DB results are also reported without the 2024 class. | 2024 `BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION` attempts end after 5.3 to 6.6 s. 2023 attempts last about 11.7 s and 2025 about 10.2 s. Without a cap, later breaks could only be found outside 2024. |
 | A4 | Fisher standard error is `1 / sqrt(n - 3 - (k - 1))` for `k` draft classes. | Removing `k` class means costs `k - 1` degrees of freedom beyond an ordinary Pearson correlation. |
 | A5 | `te_secondary_three_cone_completion` is flagged `underpowered`. It stays in the family of 6 and in the Bonferroni count. | Only 7 tight ends in 2 classes have a 3-cone time and at least 5 regular-season targets. |
+| A6 | Backpedal attempts with no break in the first 5.5 s are kept, not dropped. If the athlete moved and the recording lasted at least 5.0 s, the attempt is censored at 5.5 s (`break_censored`), which ranks it slowest. The two DB break-time tests become a pooled within-class Spearman correlation (ranks inside each class, average ranks for ties, then demeaned), with Fisher variance `1.06 / (n - 3 - (k - 1))`. Speed retention is only defined at a break, so the retention test keeps only attempts with a detected break and stays Pearson. Every row now reports `p_value`, and the break rows report `n_censored`. | Under A3 alone, only 70 of 241 backpedal attempts kept a break time. Censoring keeps all 241 and keeps the information that the player had not broken by 5.5 s. |
 
 Other checks from the same run:
 

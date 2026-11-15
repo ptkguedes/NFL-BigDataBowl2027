@@ -35,11 +35,48 @@ def test_break_after_the_cap_is_not_detected() -> None:
     speed = np.full(times.shape, 5.0)
     direction = np.where(times >= 6.0, 90.0, 0.0)
     capped = features_for_attempt(times, speed, direction, max_break_time_s=5.5)
-    assert np.isnan(capped["time_to_break_s"])
+    # Amendment A6: censored at the cap, not dropped; no retention without a break.
+    assert capped["time_to_break_s"] == pytest_approx(5.5)
+    assert capped["break_censored"] == 1.0
+    assert np.isnan(capped["speed_retention"])
     uncapped = features_for_attempt(times, speed, direction, max_break_time_s=None)
     assert uncapped["time_to_break_s"] == pytest_approx(6.0)
     early = np.where(times >= 3.0, 90.0, 0.0)
-    assert features_for_attempt(times, speed, early)["time_to_break_s"] == pytest_approx(3.0)
+    detected = features_for_attempt(times, speed, early)
+    assert detected["time_to_break_s"] == pytest_approx(3.0)
+    assert detected["break_censored"] == 0.0
+
+
+def test_short_recording_without_a_break_is_not_censored() -> None:
+    times = np.arange(0.0, 4.0, 0.1)
+    speed = np.full(times.shape, 5.0)
+    direction = np.zeros(times.shape)
+    features = features_for_attempt(times, speed, direction, max_break_time_s=5.5)
+    assert np.isnan(features["time_to_break_s"])
+    assert np.isnan(features["break_censored"])
+
+
+def test_censored_player_flag_uses_the_median_attempt() -> None:
+    from bdb2027.combine_features import predictor_table
+
+    attempts = pd.DataFrame(
+        {
+            "nfl_id": [7, 7, 8, 8],
+            "draft_year": [2023] * 4,
+            "drill_type": ["SKILL_DRILLS_DB"] * 4,
+            "drill_name": ["BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION"] * 4,
+            "time_to_break_s": [5.5, 5.5, 4.0, 5.5],
+            "speed_retention": [np.nan, np.nan, 0.9, np.nan],
+            "decel_magnitude": [3.0, 3.0, 3.0, 3.0],
+        }
+    )
+    results = pd.DataFrame({"nfl_id": [7, 8], "draft_year": [2023, 2023]})
+    table = predictor_table(attempts, results).set_index("nfl_id")
+    assert bool(table.loc[7, "db_break_censored"]) is True
+    assert bool(table.loc[8, "db_break_censored"]) is False
+    assert table.loc[8, "db_break_time_s"] == pytest_approx(4.75)
+    assert table.loc[8, "db_speed_retention"] == pytest_approx(0.9)
+    assert np.isnan(table.loc[7, "db_speed_retention"])
 
 
 def test_no_break_leaves_time_missing_but_keeps_the_brake() -> None:

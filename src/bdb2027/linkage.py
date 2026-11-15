@@ -5,7 +5,9 @@ means are removed before the correlation, so a year that was timed or coded
 differently cannot create the association by itself. The interval treats
 players as independent after that demeaning; it is not a cluster-robust interval.
 Since amendment A4 (2026-11-15) the Fisher standard error is
-1 / sqrt(n - 3 - (k - 1)) for k draft classes.
+1 / sqrt(n - 3 - (k - 1)) for k draft classes. Since amendment A6 the DB
+break-time tests rank both variables inside each class first (a pooled
+within-class Spearman correlation) and use variance 1.06 / (n - 3 - (k - 1)).
 """
 
 from __future__ import annotations
@@ -18,7 +20,9 @@ import pandas as pd
 from bdb2027.preregistration import (
     MIN_CLASS_PLAYERS,
     PREREGISTERED_TESTS,
+    RANK_TESTS,
     SMALL_N_THRESHOLD,
+    SPEARMAN_VARIANCE_FACTOR,
     UNDERPOWERED_TESTS,
     PreRegisteredTest,
     bonferroni_alpha,
@@ -31,6 +35,7 @@ def _fisher_interval(
     n_players: int,
     z_critical: float = 1.96,
     n_classes: int = 1,
+    variance_factor: float = 1.0,
 ) -> tuple[float, float]:
     extra_means = max(int(n_classes) - 1, 0)
     dof = n_players - 3 - extra_means
@@ -38,10 +43,24 @@ def _fisher_interval(
         return (np.nan, np.nan)
     clipped = float(np.clip(correlation, -0.999999, 0.999999))
     z_value = np.arctanh(clipped)
-    standard_error = 1.0 / math.sqrt(dof)
+    standard_error = math.sqrt(variance_factor / dof)
     low = math.tanh(z_value - z_critical * standard_error)
     high = math.tanh(z_value + z_critical * standard_error)
     return (float(low), float(high))
+
+
+def _fisher_p_value(
+    correlation: float,
+    n_players: int,
+    n_classes: int,
+    variance_factor: float = 1.0,
+) -> float:
+    dof = n_players - 3 - max(int(n_classes) - 1, 0)
+    if dof <= 0 or not np.isfinite(correlation):
+        return np.nan
+    clipped = float(np.clip(correlation, -0.999999, 0.999999))
+    z_value = abs(np.arctanh(clipped)) / math.sqrt(variance_factor / dof)
+    return float(math.erfc(z_value / math.sqrt(2.0)))
 
 
 def within_class_pearson(
@@ -52,8 +71,17 @@ def within_class_pearson(
     class_col: str = "draft_year",
     orient: str = "as_is",
     min_class_players: int = MIN_CLASS_PLAYERS,
+    method: str = "pearson",
+    censored_col: str | None = None,
 ) -> dict[str, object]:
-    """Pooled within-class Pearson r and a 95% Fisher interval."""
+    """Pooled within-class correlation and a 95% Fisher interval.
+
+    `method` is `pearson` or `spearman`. For `spearman` both variables are
+    ranked inside each class (average ranks for ties) before demeaning.
+    `censored_col`, if present in `frame`, is counted in `n_censored`.
+    """
+    if method not in ("pearson", "spearman"):
+        raise ValueError(f"unknown method: {method}")
     result: dict[str, object] = {
         "n_players": 0,
         "n_classes": 0,
@@ -62,11 +90,15 @@ def within_class_pearson(
         "ci_low": np.nan,
         "ci_high": np.nan,
         "small_n": True,
+        "method": method,
+        "p_value": np.nan,
+        "n_censored": 0,
     }
     if frame.empty or predictor not in frame.columns or outcome not in frame.columns:
         return result
 
     working = frame.loc[:, [class_col, predictor, outcome]].copy()
+    has_censor = censored_col is not None and censored_col in frame.columns
     working[predictor] = pd.to_numeric(working[predictor], errors="coerce")
     working[outcome] = pd.to_numeric(working[outcome], errors="coerce")
     if orient == "flip":
@@ -76,6 +108,9 @@ def within_class_pearson(
     working = working.dropna()
     if working.empty:
         return result
+    if has_censor:
+        flags = frame.loc[working.index, censored_col]
+        working["_censored"] = flags.astype("boolean").fillna(False).astype(bool)
 
     counts = working.groupby(class_col)[predictor].transform("size")
     working = working.loc[counts >= min_class_players]
@@ -83,6 +118,9 @@ def within_class_pearson(
         return result
 
     class_sizes = working.groupby(class_col).size()
+    if method == "spearman":
+        working[predictor] = working.groupby(class_col)[predictor].rank(method="average")
+        working[outcome] = working.groupby(class_col)[outcome].rank(method="average")
     working["x_dev"] = working[predictor] - working.groupby(class_col)[predictor].transform("mean")
     working["y_dev"] = working[outcome] - working.groupby(class_col)[outcome].transform("mean")
     x_dev = working["x_dev"].to_numpy(dtype=float)
@@ -92,7 +130,13 @@ def within_class_pearson(
         correlation = np.nan
     else:
         correlation = float(np.corrcoef(x_dev, y_dev)[0, 1])
-    ci_low, ci_high = _fisher_interval(correlation, n_players, n_classes=int(class_sizes.shape[0]))
+    variance_factor = SPEARMAN_VARIANCE_FACTOR if method == "spearman" else 1.0
+    n_classes = int(class_sizes.shape[0])
+    ci_low, ci_high = _fisher_interval(
+        correlation, n_players, n_classes=n_classes, variance_factor=variance_factor
+    )
+    p_value = _fisher_p_value(correlation, n_players, n_classes, variance_factor)
+    n_censored = int(working["_censored"].sum()) if has_censor else 0
     result.update(
         {
             "n_players": n_players,
@@ -102,6 +146,8 @@ def within_class_pearson(
             "ci_low": ci_low,
             "ci_high": ci_high,
             "small_n": n_players < SMALL_N_THRESHOLD,
+            "p_value": p_value,
+            "n_censored": n_censored,
         }
     )
     return result
@@ -120,6 +166,8 @@ def evaluate_tests(
             test.predictor,
             test.outcome,
             orient=test.orient,
+            method="spearman" if test.test_id in RANK_TESTS else "pearson",
+            censored_col="db_break_censored" if test.predictor == "db_break_time_s" else None,
         )
         rows.append(
             {

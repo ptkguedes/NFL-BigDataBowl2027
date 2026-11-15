@@ -268,6 +268,12 @@ def test_pipeline_reports_within_class_effects(tmp_path: Path) -> None:
     three_cone = effects.loc[effects["test_id"].eq("te_secondary_three_cone_completion")].iloc[0]
     assert bool(three_cone["underpowered"]) is True
     assert int(effects["underpowered"].sum()) == 1
+    methods = dict(zip(effects["test_id"], effects["method"], strict=True))
+    assert methods["db_primary_break_separation"] == "spearman"
+    assert methods["db_secondary_break_completion"] == "spearman"
+    assert methods["db_secondary_retention_epa"] == "pearson"
+    assert methods["te_primary_decel_separation"] == "pearson"
+    assert effects["p_value"].between(0, 1).all()
 
 
 def test_preseason_targets_are_dropped(tmp_path: Path) -> None:

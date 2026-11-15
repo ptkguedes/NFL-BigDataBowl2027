@@ -88,6 +88,38 @@ MAX_BREAK_TIME_S: float = 5.5
 SENSITIVITY_DROP_CLASS: int = 2024
 UNDERPOWERED_TESTS: frozenset[str] = frozenset({"te_secondary_three_cone_completion"})
 
+# ---------------------------------------------------------------------------
+# Amendment A6, dated 2026-11-15 (supersedes the "drop" part of A3).
+#
+# A3 dropped every backpedal attempt with no break in the first
+# MAX_BREAK_TIME_S, which kept a break time for only 70 of 241 attempts.
+# A6 keeps them:
+#   - An attempt where the athlete started moving, no break was found within
+#     MAX_BREAK_TIME_S, and the recording lasted at least
+#     MIN_CENSOR_DURATION_S, is right-censored: time_to_break_s is set to
+#     MAX_BREAK_TIME_S and break_censored is 1. Every detected break is at or
+#     under MAX_BREAK_TIME_S, so a censored attempt ranks as the slowest.
+#     Shorter recordings with no break stay missing, because "no break yet"
+#     is not informative there.
+#   - The player value is still the median over attempts. A player whose
+#     median is MAX_BREAK_TIME_S is flagged db_break_censored.
+#   - The two DB break-time tests use a rank method (RANK_TESTS): ranks inside
+#     each draft class (average ranks for ties, so all censored players tie at
+#     the slowest rank), demeaned inside the class, then Pearson on the
+#     deviations, which is a pooled within-class Spearman correlation. The
+#     Fisher interval for those rows uses the Fieller-Hartley-Pearson
+#     variance 1.06 / (n - 3 - (k - 1)).
+#   - Speed retention is defined at the break, so censored attempts have no
+#     retention value. db_secondary_retention_epa keeps only attempts with a
+#     detected break and stays a Pearson test.
+#   - Scouting reading: the ordering among detected breakers is the signal.
+#     Players at or past MAX_BREAK_TIME_S are context, not a ranked group.
+MIN_CENSOR_DURATION_S: float = 5.0
+SPEARMAN_VARIANCE_FACTOR: float = 1.06
+RANK_TESTS: frozenset[str] = frozenset(
+    {"db_primary_break_separation", "db_secondary_break_completion"}
+)
+
 
 @dataclass(frozen=True)
 class PreRegisteredTest:
