@@ -45,6 +45,14 @@ def build_parser() -> argparse.ArgumentParser:
             "the source meets Rules section 2.6. Ratings are not written back out."
         ),
     )
+    parser.add_argument(
+        "--robustness",
+        action="store_true",
+        help=(
+            "Also write <output>_robustness.csv: aggregate robustness checks for the "
+            "DB speed-retention -> EPA-allowed row. Not pre-registered."
+        ),
+    )
     return parser
 
 
@@ -79,6 +87,17 @@ def main(argv: list[str] | None = None) -> int:
     print("Sensitivity check, DB tests without the 2024 class:")
     print(effects_summary(sensitivity))
     print(f"Wrote {sensitivity_path}")
+    if args.robustness:
+        from bdb2027.io import load_players
+        from bdb2027.robustness import retention_robustness
+
+        players = load_players(data_dir).drop_duplicates("nfl_id", keep="first")
+        robustness = retention_robustness(result, players)
+        robustness_path = output.with_name(output.stem + "_robustness.csv")
+        robustness.to_csv(robustness_path, index=False)
+        print("Robustness checks, DB speed retention -> EPA allowed (not pre-registered):")
+        print(robustness.to_string(index=False))
+        print(f"Wrote {robustness_path}")
     external = result["external"]
     if external["status"] == "computed":
         external_path = output.with_name(output.stem + "_external.csv")

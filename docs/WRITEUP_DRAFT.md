@@ -1,107 +1,117 @@
-# Write-up outline
+# Write-up draft
 
-This is the outline for the Kaggle write-up. It is not the submission. The finished write-up has to stay at or under 2,000 words and use fewer than 10 tables or figures. An attached public notebook is required. Do not submit this draft to the Grand Prize track.
+This file has two parts. Part A, between the `SUBMISSION START` and `SUBMISSION END` markers, is the draft text for the Kaggle write-up. `tests/test_writeup.py` checks that it stays at or under 2,000 words and under 10 tables and figures. Part B is author notes, which are not submitted. Numbers come from the local run of `python -m bdb2027 --data-dir data --robustness` on the competition files (amendments A1-A6, 2026-11-15). Re-run before submitting and update every number.
 
-Working title: Combine brakes and NFL separation for tight ends and defensive backs
+Track to select at submission: Open or University. University only if every member is an undergraduate. Leave the Grand Prize track empty unless that changes.
 
-Working subtitle: Within-draft-class links from 10 Hz Combine tracking to targeted-route separation
+<!-- SUBMISSION START -->
 
-Track to select at submission: Open or University. University only if every member is an undergraduate. Leave the Grand Prize track empty.
+# Holding speed through the break: Combine backpedal tracking and EPA allowed by rookie defensive backs
 
-## 1. Question
+*A finding that came after the amendments and still needs validation, with honest nulls for break time and tight ends.*
 
-Two pre-registered questions, nothing else in the scored family.
+## Summary
 
-Tight ends. Do Combine explosiveness and deceleration measures translate to route separation and target outcomes? The measures are the 10-yard split, the 3-cone time, and the braking peak on TE position drills (`SKILL_DRILLS_TE`) from 10 Hz tracking.
+We linked 10 Hz Combine tracking to regular-season NFL coverage for the 2023-2025 draft classes. One measure stood out. Defensive backs who kept more of their speed through the 45-degree break in the backpedal drill allowed less offensive EPA per credited target. The pooled within-class correlation is r = -0.60 (95% interval -0.81 to -0.25, p = 0.002, n = 26 players in 3 classes). It holds without the 2024 class, whose drill recordings are cut short (r = -0.65, n = 15).
 
-Defensive backs. Does the backpedal-to-break transition (`BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION`) predict coverage outcomes: separation allowed, completions allowed, and offensive EPA allowed?
+This is a lead to validate, not a settled result. It is a secondary test in a pre-registered family of six. It only appeared after we amended the definitions once we had seen the first run, and the sample is small. Time to the break, the measure we expected to matter, shows no link to separation allowed. The tight-end tests are weak.
 
-The tracking requirement is met by the TE drill series and by the DB transition series, plus in-game `pass_forward` frames for the DB outcomes. Stopwatch times are the traditional comparison, not a substitute for the tracking.
+## Data
 
-## 2. Pre-registered family
+We used the nine competition files. Game tracking and `player_play.csv` cover only the 510 draftees, about three tracked players per throw. Outcomes use regular-season games only (`season_type` REG). Plays nullified by penalty are dropped. Comparisons are always made inside a draft class, because Combine recording differs by year. The clearest case is the 2024 backpedal drill: its attempts end after about 6 seconds, against 10 to 12 seconds in 2023 and 2025.
 
-State that this list was fixed before the competition CSVs were analyzed. Report every row. Do not add a test after seeing the result without saying that it was not pre-registered.
+## Measures
 
-| Role | Angle | Predictor | Outcome | Expected sign |
-| --- | --- | --- | --- | --- |
-| Primary | TE | Harder brake on TE position drills | Mean separation when targeted | Positive |
-| Secondary | TE | Faster 10-yard split | Mean separation when targeted | Positive |
-| Secondary | TE | Faster 3-cone | Completion rate when targeted | Positive |
-| Primary | DB | Quicker time to the 45-degree break | Mean separation allowed | Negative |
-| Secondary | DB | Speed kept through that break | Mean offensive EPA allowed | Negative |
-| Secondary | DB | Quicker time to the break | Completion rate allowed | Negative |
+**Break.** Breaks are not labeled in the Combine file. We define the break as the first frame, after the athlete passes 1 yd/s, where his direction of travel has turned 45 degrees from his opening heading. We look only in the first 5.5 seconds of each attempt, in every year, so that 2024 is not penalized. An attempt with no break by 5.5 seconds is censored at 5.5 seconds and ranks slowest. A player's value is the median over his attempts.
 
-Family size is 6. The interval on each row is an unadjusted 95% Fisher interval. The Bonferroni reference threshold is 0.05/6. The write-up should show the interval and the sample size, not a star.
+**Speed retention.** This is median speed in the 0.3 seconds after the break divided by median speed in the 0.3 seconds before it. It exists only for detected breaks.
 
-This table is one of the write-up's tables. Count it.
+**Coverage credit.** A targeted draftee receiver is credited to the closest opposing draftee DB who has an active `coverage_assignment` on that play, if that DB is within 5 yards at `pass_forward`. Each credited target carries the play's EPA, completion, and the receiver's `separation_at_pass_forward`. A DB enters the tests with at least 5 credited targets.
 
-## 3. Data and definitions
+## Method
 
-Name the nine competition files and the CC BY-NC 4.0 limits. Do not attach the files.
+Inside each draft class we demean the predictor and the outcome, then correlate the deviations. The two break-time tests rank both variables inside the class first (a pooled within-class Spearman), so censored players tie at the slowest rank. Intervals are Fisher intervals that spend one degree of freedom per class mean removed. The Spearman rows use the 1.06 variance factor. The family has six tests with a Bonferroni threshold of 0.05/6 = 0.0083. Table 1 reports all six.
 
-Definitions to state in plain language:
+**Table 1. Pre-registered family after amendments A1-A6.** Expected sign is for "more of the trait".
 
-- Draft class is `draft_year`. Classes are not pooled on the raw scale, because Combine recording can differ by year. Both the predictor and the outcome are demeaned inside the class. The correlation is the Pearson correlation of those deviations.
-- A TE play counts when `nfl_position` is TE, `lined_up_position` is TE, the play is not nullified by penalty, and `target` is true. Separation is `separation_at_pass_forward`. A completion is `pass_result` of `C`.
-- Outcomes come from regular-season games only (`season_type` `REG`, amendment A1).
-- A DB outcome is not a published column (amendment A2). Only the 510 draftees are tracked in games. A draftee DB (NFL position CB, SS, FS, DB, or S) is credited with a target when the targeted receiver is a tracked draftee, the DB is on the defense with an active `coverage_assignment` (not missing, not `NO_ASSIGNMENT`), and at `pass_forward` he is the closest such DB to the receiver and within 5 yards. Separation allowed is the receiver's `separation_at_pass_forward`. Completion and EPA are the play's `pass_result` and `expected_points_added`.
-- A break is the first frame, after speed reaches 1 yard per second and within the first 5.5 s of the attempt (amendment A3), where heading has moved 45 degrees from the opening heading. An attempt with no break by 5.5 s is censored at 5.5 s (amendment A6). The DB break-time tests are rank based, so a censored player counts only as "slower than every detected breaker in his class". That label is not on the file. Deceleration is the drop in speed per second. Column `a` is not treated as a signed brake, because the data page does not say it is signed.
-- Inclusion floors: at least five targeted TE plays, and at least five credited targets for a DB. A class needs at least three such players to enter the pooled correlation.
-- The notes of about 18 tight ends and about 62 defensive backs are planning cautions from the project brief. Replace them with the actual `n_players` and `class_counts` from `outputs/effects.csv`. Mark `small_n` when that count is under 20.
+| Test | Method | r | 95% interval | p | n |
+| --- | --- | --- | --- | --- | --- |
+| TE: harder brake on TE drills -> separation | Pearson | 0.16 | -0.30, 0.57 | 0.49 | 22 |
+| TE: faster 10-yard split -> separation | Pearson | 0.08 | -0.40, 0.53 | 0.74 | 20 |
+| TE: faster 3-cone -> completion rate (underpowered) | Pearson | 0.75 | -0.16, 0.97 | 0.09 | 7 |
+| DB: quicker break -> separation allowed | Spearman | -0.02 | -0.32, 0.28 | 0.91 | 47 |
+| DB: more speed retention -> EPA allowed | Pearson | -0.60 | -0.81, -0.25 | 0.002 | 26 |
+| DB: quicker break -> completion rate allowed | Spearman | 0.22 | -0.09, 0.49 | 0.16 | 47 |
 
-## 4. Method, in one short section
+## Defensive backs: speed retention and EPA allowed
 
-One paragraph on within-class demeaning, one on the Fisher interval and its limit (players are treated as independent after demeaning; since amendment A4 the interval spends `k - 1` degrees of freedom for the `k` class means), and one on multiplicity. Say that a wide interval is an expected result at this sample size, not a failed chart.
+**Figure 1.** Within-class deviations of speed retention against EPA allowed per credited target, one point per DB, colored by draft class.
 
-No model beyond this correlation family belongs in the write-up unless it is labeled as not pre-registered.
+Rookie DBs who came out of the break closer to their entry speed gave up less EPA when targeted. Table 2 checks how fragile that is. None of these checks were pre-registered.
 
-## 5. Tight ends
+**Table 2. Robustness of the retention -> EPA row.**
 
-Placeholder for the primary scatter of within-class deviations and a sentence that matches the sign of `te_primary_decel_separation`. Then the two secondary rows, including a null if that is what the interval shows. Do not rank prospects.
+| Check | r | Interval | n |
+| --- | --- | --- | --- |
+| Main row | -0.60 | -0.81, -0.25 | 26 |
+| Within-class Spearman | -0.54 | -0.78, -0.17 | 26 |
+| Without 2023 | -0.65 | -0.86, -0.25 | 18 |
+| Without 2024 | -0.65 | -0.88, -0.19 | 15 |
+| Without 2025 | -0.41 | -0.74, 0.07 | 19 |
+| Bootstrap within class (2,000 draws) | -0.60 | -0.86, -0.29 | 26 |
+| Range when any one player is removed | -0.71 to -0.52 | | 26 |
+| At least 10 credited targets | -0.43 | -0.79, 0.16 | 14 |
+| Man-coverage targets only | -0.65 | -0.85, -0.29 | 22 |
+| Zone targets only | -0.26 | -0.62, 0.19 | 23 |
 
-Planned figures: the within-class scatter, and one forest of the three TE intervals. Those are two figures.
+The sign never flips, and no single player drives it. The weak points are just as clear. Dropping 2025 or raising the target floor widens the interval across zero. Most of the association sits in man coverage, where the credited DB is most likely the real coverage defender and where carrying speed through a break should matter most. That is a reading, not a test.
 
-## 6. Defensive backs
+## Defensive backs: time to the break
 
-Same shape for `db_primary_break_separation`, then EPA allowed and completions allowed. State that "allowed" means "the closest assigned draftee DB within 5 yards of a draftee target at the throw." Undrafted and veteran defenders and receivers are not tracked, so many real coverage snaps are invisible and a credited DB can be a zone defender near the play rather than the charted primary defender. That is a limitation, not a footnote to hide. Report the sensitivity rows without the 2024 class next to the main rows.
+Quicker breaks do not go with less separation allowed (Spearman -0.02). They also do not go with fewer completions allowed. That row has the opposite sign to what we expected (0.22, interval -0.09 to 0.49).
 
-Scouting framing (amendment A6). The useful ordering is among the players who broke within 5.5 s, and the write-up should lead with them: who is quickest to the break inside his draft class, and whether that ordering lines up with coverage results. Players at or past 5.5 s are context. Show how many there are per class and their average outcomes, but do not rank them against each other, because the drill does not separate them. On the current run 21 of the 47 DBs in the break tests were censored. They allowed a 52.6% completion rate and 2.46 yards of separation, against 61.0% and 2.39 yards for the 26 detected breakers. That is one sentence of context, not a test.
+For scouting, the ordering that matters is among players who broke inside 5.5 seconds. The drill cannot separate the rest from each other, so we treat them as context. In the break tests, 21 of 47 DBs had a median attempt with no break by 5.5 seconds. Those slow breakers allowed a 52.6% completion rate on credited targets, against 61.0% for the 26 faster breakers, with similar separation (2.46 against 2.39 yards). One possible reading is that slow breakers line up deeper or play off, so the throws credited to them are harder ones. We have not tested that. Alignment depth (`cushion`) is the next check.
 
-Planned figures: the within-class scatter, and one forest of the three DB intervals. Those are two figures.
+**Figure 2.** 95% intervals for all six family tests and the Table 2 checks, in one forest plot.
 
-## 7. Optional external benchmark
+## Tight ends
 
-Include this section only if the rating source has been checked against Rules section 2.6 and is public and free for every participant, or meets the host's Reasonableness Standard. Otherwise delete the section and do not spend a figure on it.
+The TE tests are weak. TE-drill braking and the 10-yard split show small positive correlations with separation when targeted, with intervals wide enough to include a moderate effect in either direction. The 3-cone test has only seven players with a time and enough targets, so we report it without reading anything into it.
 
-If it is included, label it as a secondary benchmark, not as a Combine-to-NFL test. The core family does not use it. Name the source, the season or edition of the ratings, and the license under which other teams can obtain the same file at no cost. Say that Madden ratings were not cleared by the rules check in `docs/RULES_CHECKLIST.md` unless that statement is no longer true because a qualifying source was found later.
+## What a team could use
 
-The code path is off by default:
+If speed retention through a backpedal break holds in new draft classes, it is cheap to compute from data teams already have. It points at something that stopwatch drills cannot see: how much speed a defender gives up when he changes direction, rather than how fast he can change direction. At this sample size it is a tiebreaker for film study of DBs who already break quickly, not a ranking tool.
 
-```bash
-python -m bdb2027 --data-dir data --enable-external-benchmark \
-  --external-benchmark /path/outside/the/repo/ratings.csv
-```
+## Limitations
 
-Columns, if present: Speed, Acceleration, Agility, Change of Direction, Route Running, Release, Man Coverage, Zone Coverage, joined on `nfl_id`. The comparison is within draft class, for tight ends and defensive backs only. Do not commit the file. Do not scrape a ratings site to create it.
+- Small samples, six related tests, and amendments made after the first run.
+- Only draftees are tracked, so many coverage snaps are invisible and a credited DB is "an assigned draftee near the target", not a charted primary defender.
+- Observational. Opponent, scheme, role, and injury are not adjusted for.
+- The break is a reproducible definition, not an official NGS event, and 2024 recordings are shorter.
 
-If this section is used, it may add one scatter. Drop another figure first if the write-up would otherwise reach 10 tables or figures.
+## Reproducibility
 
-## 8. What a team could do with the result
+The public Kaggle notebook calls `bdb2027.pipeline.run_analysis` on `/kaggle/input/nfl-big-data-bowl-2027/` and rebuilds Tables 1-2 and Figures 1-2. All definitions and dated amendments are in `src/bdb2027/preregistration.py`.
 
-One short paragraph aimed at the football score. If the primary intervals cover zero, say that the drill is a weak week-to-week separator at this sample size. If an interval sits away from zero, say the direction and the position group, and say what the measure does not adjust for: opponent, scheme, injury, and role.
+<!-- SUBMISSION END -->
 
-## 9. Limitations
+## Part B. Author notes (not submitted)
 
-- Small n and six related tests.
-- Observational. The interval is not a causal effect of training the drill.
-- DB credit (amendment A2) uses `coverage_assignment` and distance among tracked draftees, not a charted primary defender. Only draftee-on-draftee targets enter.
-- The 5.5 s break cap (amendment A3) only sees breaks in the first 5.5 s: 70 of 241 backpedal attempts have one. Since amendment A6 the other 171 are censored at 5.5 s and enter the break tests as tied slowest ranks. The speed-retention test still uses only the 70 detected breaks.
-- The TE 3-cone test is underpowered (n = 7).
-- Combine drill labels and the 45-degree rule are a reproducible definition, not an official NGS event.
-- Outcomes pool the seasons present in the files. Playing time beyond the target floors is reported from `player_career_successes.csv` and is not a covariate in the six tests.
-- External ratings, if used, are not the evidence for the two gates. The gates rest on Combine tracking and NFL performance.
+### Rules reminders
 
-## Amendments
+- At or under 2,000 words, fewer than 10 tables or figures, attached public notebook. Part A has 2 tables and 2 figures.
+- The write-up has to use Combine tracking and link it to regular-season performance. Both gates rest on the backpedal drill series and regular-season `player_play` outcomes.
+- Do not attach or quote row-level competition data. Tables 1-2 are aggregates.
+- Optional external benchmark (Madden or other ratings): include it only if the source is public and free for every participant, or meets the host's Reasonableness Standard (Rules section 2.6). It is off by default (`--enable-external-benchmark`), it is not part of the family, and it would cost a figure.
+
+### Before submitting
+
+1. Re-run with `--robustness` and replace every number in Part A.
+2. Check `cushion` (alignment depth) for slow against fast breakers before keeping the "deeper alignment" sentence.
+3. If a later class or holdout becomes available, test retention -> EPA there first. That is the validation this lead needs.
+4. Make Figure 1 and Figure 2 in the notebook. Do not add a chart that does not change the claim.
+
+### Amendments and results history
 
 Dated 2026-11-15, after the first run on the competition files. State in the write-up that these came after seeing the first results, and show both runs. The definitions are in `src/bdb2027/preregistration.py`.
 
@@ -139,11 +149,3 @@ After amendment A6 (censoring and Spearman for the two break-time rows; the othe
 The completion row is positive, which is the opposite of the expected negative sign: quicker breakers allowed slightly more completions. Its interval covers zero.
 
 Only `db_secondary_retention_epa` clears the Bonferroni threshold of 0.05 / 6 (two-sided p about 0.002 on the amended run). It is a secondary test, its sign flipped between the two runs, and the amendments came after the first run. Present it as a lead to check, not a finding. Without the break cap (A1, A2, A4 only) the same test gives -0.428 [-0.663, -0.116] with n 38.
-
-## 10. Appendix and notebook
-
-Point to the public notebook `notebooks/bdb2027_combine_to_nfl.ipynb` after it has been copied to Kaggle and set to public. The notebook reads `/kaggle/input/nfl-big-data-bowl-2027/` and calls `bdb2027.pipeline.run_analysis`. Most code stays there, not in the write-up.
-
-## Figure budget
-
-Counted tables and figures in the finished write-up, before any optional benchmark chart: the family table, a sample-size table, two scatters, and two forests. That is 6, under the limit of fewer than 10. Do not add a chart that does not change the claim.

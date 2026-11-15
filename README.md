@@ -9,11 +9,17 @@ This repository studies two pre-registered questions:
 - **Tight ends.** Do Combine explosiveness and deceleration measures (10-yard split, 3-cone, and TE position-drill braking from 10 Hz tracking) line up with in-game route separation and target outcomes?
 - **Defensive backs.** Does the quality of the backpedal-to-break transition (`BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION`) line up with separation allowed, completions allowed, and EPA allowed?
 
+## Current lead (to validate)
+
+On the 2023-2025 draft classes, after the dated amendments A1-A6 (2026-11-15), the DB thesis is **speed retention through the backpedal break goes with lower EPA allowed**. The within-class correlation is r = -0.60 (95% interval -0.81 to -0.25, p = 0.002, n = 26), and it holds without the 2024 class (r = -0.65, n = 15). It is a secondary test that only appeared after the amendments, so it is a lead to validate, not a result. Robustness checks are in `docs/WRITEUP_DRAFT.md` (Table 2). Time to the break shows no link to separation allowed. DBs with no break by 5.5 s allowed fewer completions, possibly because they align deeper, which is untested. The tight-end tests are weak.
+
+Run `python -m bdb2027 --data-dir data --robustness` to also write `<output>_robustness.csv`. It holds only aggregate statistics: leave-one-class-out, bootstrap, leave-one-player-out, target floor, and man/zone split.
+
 Comparisons are **within draft class**. The code reports a pooled within-class Pearson correlation, a 95% Fisher interval, the class counts, and a Bonferroni threshold for the six-test family. Sample sizes around a position group are small; the result table marks `small_n` when fewer than 20 players enter a test.
 
 ## Rules
 
-`docs/RULES_CHECKLIST.md` records what was checked against the Kaggle competition pages, the Kaggle competition record, and the NFL Football Operations Big Data Bowl page, including items that could not be verified. `docs/WRITEUP_DRAFT.md` is an outline for the write-up, not the submission itself.
+`docs/RULES_CHECKLIST.md` records what was checked against the Kaggle competition pages, the Kaggle competition record, and the NFL Football Operations Big Data Bowl page, including items that could not be verified. `docs/WRITEUP_DRAFT.md` holds the draft submission text between markers (checked by `tests/test_writeup.py` for at most 2,000 words and fewer than 10 tables and figures) and author notes that are not submitted.
 
 ## Data
 
