@@ -30,6 +30,18 @@ def test_ball_rows_do_not_enter_the_attempt() -> None:
     assert features.loc[0, "decel_magnitude"] == pytest_approx(50.0)
 
 
+def test_break_after_the_cap_is_not_detected() -> None:
+    times = np.arange(0.0, 8.0, 0.1)
+    speed = np.full(times.shape, 5.0)
+    direction = np.where(times >= 6.0, 90.0, 0.0)
+    capped = features_for_attempt(times, speed, direction, max_break_time_s=5.5)
+    assert np.isnan(capped["time_to_break_s"])
+    uncapped = features_for_attempt(times, speed, direction, max_break_time_s=None)
+    assert uncapped["time_to_break_s"] == pytest_approx(6.0)
+    early = np.where(times >= 3.0, 90.0, 0.0)
+    assert features_for_attempt(times, speed, early)["time_to_break_s"] == pytest_approx(3.0)
+
+
 def test_no_break_leaves_time_missing_but_keeps_the_brake() -> None:
     times = np.arange(0.0, 0.6, 0.1)
     speed = np.array([2, 4, 6, 5, 4, 3], dtype=float)

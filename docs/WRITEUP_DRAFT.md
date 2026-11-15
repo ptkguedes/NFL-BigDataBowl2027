@@ -43,14 +43,15 @@ Definitions to state in plain language:
 
 - Draft class is `draft_year`. Classes are not pooled on the raw scale, because Combine recording can differ by year. Both the predictor and the outcome are demeaned inside the class. The correlation is the Pearson correlation of those deviations.
 - A TE play counts when `nfl_position` is TE, `lined_up_position` is TE, the play is not nullified by penalty, and `target` is true. Separation is `separation_at_pass_forward`. A completion is `pass_result` of `C`.
-- A DB outcome is not a published column. At `pass_forward`, the targeted receiver is assigned to the nearest player whose NFL position is CB, SS, FS, DB, or S. Separation allowed is that distance in yards. Completion and EPA are the play's `pass_result` and `expected_points_added`.
-- A break is the first frame, after speed reaches 1 yard per second, where heading has moved 45 degrees from the opening heading. That label is not on the file. Deceleration is the drop in speed per second. Column `a` is not treated as a signed brake, because the data page does not say it is signed.
-- Inclusion floors: at least five targeted TE plays, and at least five covered targets for a DB. A class needs at least three such players to enter the pooled correlation.
+- Outcomes come from regular-season games only (`season_type` `REG`, amendment A1).
+- A DB outcome is not a published column (amendment A2). Only the 510 draftees are tracked in games. A draftee DB (NFL position CB, SS, FS, DB, or S) is credited with a target when the targeted receiver is a tracked draftee, the DB is on the defense with an active `coverage_assignment` (not missing, not `NO_ASSIGNMENT`), and at `pass_forward` he is the closest such DB to the receiver and within 5 yards. Separation allowed is the receiver's `separation_at_pass_forward`. Completion and EPA are the play's `pass_result` and `expected_points_added`.
+- A break is the first frame, after speed reaches 1 yard per second and within the first 5.5 s of the attempt (amendment A3), where heading has moved 45 degrees from the opening heading. That label is not on the file. Deceleration is the drop in speed per second. Column `a` is not treated as a signed brake, because the data page does not say it is signed.
+- Inclusion floors: at least five targeted TE plays, and at least five credited targets for a DB. A class needs at least three such players to enter the pooled correlation.
 - The notes of about 18 tight ends and about 62 defensive backs are planning cautions from the project brief. Replace them with the actual `n_players` and `class_counts` from `outputs/effects.csv`. Mark `small_n` when that count is under 20.
 
 ## 4. Method, in one short section
 
-One paragraph on within-class demeaning, one on the Fisher interval and its limit (players are treated as independent after demeaning; class means were estimated and the interval does not spend those degrees of freedom), and one on multiplicity. Say that a wide interval is an expected result at this sample size, not a failed chart.
+One paragraph on within-class demeaning, one on the Fisher interval and its limit (players are treated as independent after demeaning; since amendment A4 the interval spends `k - 1` degrees of freedom for the `k` class means), and one on multiplicity. Say that a wide interval is an expected result at this sample size, not a failed chart.
 
 No model beyond this correlation family belongs in the write-up unless it is labeled as not pre-registered.
 
@@ -62,7 +63,7 @@ Planned figures: the within-class scatter, and one forest of the three TE interv
 
 ## 6. Defensive backs
 
-Same shape for `db_primary_break_separation`, then EPA allowed and completions allowed. State that "allowed" means "nearest DB at the throw," so a zone defender who was closer than the assigned man can be charged with the play. That is a limitation, not a footnote to hide.
+Same shape for `db_primary_break_separation`, then EPA allowed and completions allowed. State that "allowed" means "the closest assigned draftee DB within 5 yards of a draftee target at the throw." Undrafted and veteran defenders and receivers are not tracked, so many real coverage snaps are invisible and a credited DB can be a zone defender near the play rather than the charted primary defender. That is a limitation, not a footnote to hide. Report the sensitivity rows without the 2024 class next to the main rows.
 
 Planned figures: the within-class scatter, and one forest of the three DB intervals. Those are two figures.
 
@@ -91,10 +92,37 @@ One short paragraph aimed at the football score. If the primary intervals cover 
 
 - Small n and six related tests.
 - Observational. The interval is not a causal effect of training the drill.
-- DB assignment uses the nearest defensive back, not a charted assignment.
+- DB credit (amendment A2) uses `coverage_assignment` and distance among tracked draftees, not a charted primary defender. Only draftee-on-draftee targets enter.
+- The 5.5 s break cap (amendment A3) drops attempts whose break comes later: 70 of 241 backpedal attempts keep a break time. The DB tests therefore describe the quicker breakers only.
+- The TE 3-cone test is underpowered (n = 7).
 - Combine drill labels and the 45-degree rule are a reproducible definition, not an official NGS event.
 - Outcomes pool the seasons present in the files. Playing time beyond the target floors is reported from `player_career_successes.csv` and is not a covariate in the six tests.
 - External ratings, if used, are not the evidence for the two gates. The gates rest on Combine tracking and NFL performance.
+
+## Amendments
+
+Dated 2026-11-15, after the first run on the competition files. State in the write-up that these came after seeing the first results, and show both runs. The definitions are in `src/bdb2027/preregistration.py`.
+
+| ID | Change | Why |
+| --- | --- | --- |
+| A1 | Outcomes use only games with `season_type` `REG`. | `games.csv` has 49 PRE, 272 REG, and 13 POST games per season, although the data page lists only REG and POST. The theme and the linkage gate say regular-season performance. About 20% of targets were in PRE or POST games. |
+| A2 | DB coverage credit uses `coverage_assignment`. A draftee DB is credited with a target when the targeted receiver is a tracked draftee, the DB is on the other team with an active `coverage_assignment` (not missing, not `NO_ASSIGNMENT`), and at `pass_forward` he is the closest such DB to the receiver and within 5 yards. Separation allowed is the receiver's `separation_at_pass_forward`. | Game tracking holds only the 510 draftees, about 3 tracked players per `pass_forward` frame. The original "nearest tracked DB" was a median 12.6 yards from the target and usually not the covering defender. |
+| A3 | A break is only searched for in the first 5.5 s of each drill attempt, in every class. DB results are also reported without the 2024 class. | 2024 `BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION` attempts end after 5.3 to 6.6 s. 2023 attempts last about 11.7 s and 2025 about 10.2 s. Without a cap, later breaks could only be found outside 2024. |
+| A4 | Fisher standard error is `1 / sqrt(n - 3 - (k - 1))` for `k` draft classes. | Removing `k` class means costs `k - 1` degrees of freedom beyond an ordinary Pearson correlation. |
+| A5 | `te_secondary_three_cone_completion` is flagged `underpowered`. It stays in the family of 6 and in the Bonferroni count. | Only 7 tight ends in 2 classes have a 3-cone time and at least 5 regular-season targets. |
+
+Results, both runs. Pooled within-class Pearson r, 95% Fisher interval, n players.
+
+| Test | Original (all game types, nearest DB, no cap, n - 3) | Amended (A1-A5) | Amended, DB without 2024 |
+| --- | --- | --- | --- |
+| te_primary_decel_separation | 0.166 [-0.213, 0.502], n 29 | 0.164 [-0.300, 0.566], n 22 | |
+| te_secondary_ten_yd_separation | 0.006 [-0.398, 0.409], n 24 | 0.084 [-0.398, 0.530], n 20 | |
+| te_secondary_three_cone_completion (underpowered) | 0.063 [-0.506, 0.593], n 13 | 0.748 [-0.163, 0.970], n 7 | |
+| db_primary_break_separation | -0.080 [-0.289, 0.137], n 84 | -0.130 [-0.507, 0.288], n 26 | -0.301 [-0.717, 0.273], n 15 |
+| db_secondary_retention_epa | 0.217 [-0.003, 0.417], n 80 | -0.596 [-0.806, -0.253], n 26 | -0.652 [-0.879, -0.186], n 15 |
+| db_secondary_break_completion | -0.012 [-0.226, 0.203], n 84 | -0.277 [-0.612, 0.143], n 26 | -0.251 [-0.690, 0.323], n 15 |
+
+Only `db_secondary_retention_epa` clears the Bonferroni threshold of 0.05 / 6 (two-sided p about 0.002 on the amended run). It is a secondary test, its sign flipped between the two runs, and the amendments came after the first run. Present it as a lead to check, not a finding. Without the break cap (A1, A2, A4 only) the same test gives -0.428 [-0.663, -0.116] with n 38.
 
 ## 10. Appendix and notebook
 

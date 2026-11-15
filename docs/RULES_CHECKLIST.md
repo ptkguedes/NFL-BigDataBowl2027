@@ -92,7 +92,7 @@ The date of the Combine presentation is not on the Timeline page. The Operations
 
 Verified from the data-description page, rules sections 1.7 and 2.4, and the competition license record.
 
-The data page says the dataset has **9 CSV files**, about **2.2 GiB**, for **510** rookie prospects drafted or signed between 2023 and 2025. It also states 6,310 Combine drill attempts, 316,338 player-play records, and 1,002 games. Those counts were **not** checked against the files. This repo does not contain the files.
+The data page says the dataset has **9 CSV files**, about **2.2 GiB**, for **510** rookie prospects drafted or signed between 2023 and 2025. It also states 6,310 Combine drill attempts, 316,338 player-play records, and 1,002 games. On 2026-11-15 the downloaded files were checked locally. They had 510 prospects, 6,310 attempts, and 1,002 games, matching the page, and 314,197 `player_play.csv` rows, 2,141 fewer than the page states. `play_description` contains line breaks, so a raw line count (327,020) overstates the rows. This repo does not contain the files.
 
 | File | Role on the data page |
 | --- | --- |
@@ -100,13 +100,13 @@ The data page says the dataset has **9 CSV files**, about **2.2 GiB**, for **510
 | `combine_results.csv` | Anthropometrics and stopwatch tests, including `ten_yd_split`, `forty`, and `three_cone`, plus NGS scores. |
 | `combine_tracking.csv` | 10 Hz Combine tracking. `drill_type` examples include `SKILL_DRILLS_TE`, `SKILL_DRILLS_DB`, and `THREE_CONE_DRILL`. `drill_name` examples include `BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION`. |
 | `player_play.csv` | Play-level NFL participation and outcomes, including `separation_at_pass_forward`, `target`, `pass_result`, and `expected_points_added`. |
-| `games.csv` | Game, season, week, and home/visitor clubs. `season_type` is `REG` or `POST`. |
+| `games.csv` | Game, season, week, and home/visitor clubs. The page says `season_type` is `REG` or `POST`. The file also has `PRE` (49 games per season). See amendment A1. |
 | `player_career_successes.csv` | Career snaps, games, All-Pro, and Pro Bowl counts. |
 | `game_tracking_2023.csv` | 10 Hz in-game tracking. `event` includes `pass_forward`. |
 | `game_tracking_2024.csv` | Same schema for 2024. |
 | `game_tracking_2025.csv` | Same schema for 2025. |
 
-Column names used by this code are the names on that data page, including the published spelling `visitor_team_win_probility_added`. The loader also accepts `visitor_team_win_probability_added` if the published spelling is absent. Whether the file on disk uses the typo was not checked.
+Column names used by this code are the names on that data page, including the published spelling `visitor_team_win_probility_added`. The loader also accepts `visitor_team_win_probability_added` if the published spelling is absent. The file on disk uses the typo `visitor_team_win_probility_added` (checked 2026-11-15).
 
 License:
 
@@ -206,9 +206,27 @@ These are project choices, fixed in `src/bdb2027/preregistration.py` before any 
 - Six tests. Two are primary (TE skill-drill deceleration versus separation when targeted; DB time-to-break versus separation allowed). The other four are secondary and share one Bonferroni threshold, `0.05 / 6`.
 - Within-`draft_year` demeaning, then Pearson correlation. Effect size is that correlation. The interval is a Fisher z interval that treats players as independent after demeaning. It is not cluster-robust, and estimating class means uses degrees of freedom the interval does not remove.
 - A draft class is included only when it has at least three players with both values. `small_n` is true when the pooled player count is under 20.
-- TE inclusion floor: at least five targeted plays. DB inclusion floor: at least five targets as the nearest DB. The planning notes of about 18 tight ends and about 62 defensive backs with enough snaps are **not** measured sample sizes.
+- TE inclusion floor: at least five targeted plays. DB inclusion floor: at least five credited targets (amendment A2). The planning notes of about 18 tight ends and about 62 defensive backs with enough snaps are **not** measured sample sizes.
 - Break threshold: 45 degrees of heading change. Deceleration is computed from the change in speed, not from `a`.
 - DB positions treated as coverage players: `CB`, `SS`, `FS`, `DB`, `S`.
+
+## Amendments, 2026-11-15
+
+These were made after the first run on the competition files, so results under the original definitions had been seen. They are recorded in `src/bdb2027/preregistration.py` and in `docs/WRITEUP_DRAFT.md`, which also lists the original results.
+
+| ID | Change | Why |
+| --- | --- | --- |
+| A1 | Outcomes use only games with `season_type` `REG`. | `games.csv` has 49 PRE, 272 REG, and 13 POST games per season, although the data page lists only REG and POST. The theme and the linkage gate say regular-season performance. About 20% of targets were in PRE or POST games. |
+| A2 | DB coverage credit uses `coverage_assignment`. A draftee DB is credited with a target when the targeted receiver is a tracked draftee, the DB is on the other team with an active `coverage_assignment` (not missing, not `NO_ASSIGNMENT`), and at `pass_forward` he is the closest such DB to the receiver and within 5 yards. Separation allowed is the receiver's `separation_at_pass_forward`. | Game tracking holds only the 510 draftees, about 3 tracked players per `pass_forward` frame. The original "nearest tracked DB" was a median 12.6 yards from the target and usually not the covering defender. |
+| A3 | A break is only searched for in the first 5.5 s of each drill attempt, in every class. DB results are also reported without the 2024 class. | 2024 `BACK_PEDAL_AND_TRANSITION_45_DEGREE_REACTION` attempts end after 5.3 to 6.6 s. 2023 attempts last about 11.7 s and 2025 about 10.2 s. Without a cap, later breaks could only be found outside 2024. |
+| A4 | Fisher standard error is `1 / sqrt(n - 3 - (k - 1))` for `k` draft classes. | Removing `k` class means costs `k - 1` degrees of freedom beyond an ordinary Pearson correlation. |
+| A5 | `te_secondary_three_cone_completion` is flagged `underpowered`. It stays in the family of 6 and in the Bonferroni count. | Only 7 tight ends in 2 classes have a 3-cone time and at least 5 regular-season targets. |
+
+Other checks from the same run:
+
+- Column `a` is never negative in `combine_tracking.csv` (minimum 0), so it is a magnitude. Deceleration from the change in speed stays.
+- `BALL` entity rows exist only in the 2025 Combine file. Ball speed reaches about 25.8 yd/s. Player rows never exceed 12 yd/s. The loader already keeps only `PLAYER` rows.
+- Stopwatch times (`ten_yd_split`, `forty`, `three_cone`) have similar means and ranges in all three classes.
 
 ## Unverified or conflicting
 
@@ -219,9 +237,10 @@ These are project choices, fixed in `src/bdb2027/preregistration.py` before any 
 5. The Operations page versus Kaggle on graduate students and on who may enter the Open Track. No host forum correction was retrieved.
 6. Hackathon "one submission, no leaderboard" versus platform fields of five daily submissions, two scored submissions, and `hasLeaderboard: true`.
 7. Whether the general-rules mention of private and public test sets describes a real hidden file. The data page that was read does not list one.
-8. File-level counts (510 prospects, 6,310 attempts, 316,338 player-plays, 1,002 games, about 2.2 GiB) and the on-disk spelling of `visitor_team_win_probility_added`.
-9. Whether column `a` is a signed acceleration or a magnitude. The data page says "instantaneous player acceleration" in yards per second squared and does not say it is signed.
+8. Resolved 2026-11-15: counts match except `player_play.csv` (314,197 rows, not 316,338), and the file uses `visitor_team_win_probility_added`.
+9. Resolved 2026-11-15: column `a` is never negative, so it is a magnitude.
 10. A named individual judge, whether finalist travel and lodging are paid, whether the Combine presentation can be given remotely, and the criteria used only for the in-person Grand Prize. The track text says invited finalists present and one team receives an additional $10,000. It does not state a separate rubric.
 11. What identity-verification or University Track verification requires as documents.
 12. Host comments sometimes repeated in unofficial guides (a null result still passes, preseason or postseason outcomes count, `nflreadr` was suggested, the Operations graduate wording was called an error). Those comments were not retrieved from the competition forum for this checklist.
-13. The local WSL data directory was not inspected, because that machine was offline. See the README. Nothing here asserts that the nine files are absent from that machine.
+13. Resolved 2026-11-15: the nine files were downloaded to the local WSL `data/` directory, which is gitignored.
+14. Whether the host accepts preseason or postseason outcomes (item 12). Amendment A1 follows the official "regular-season" wording.

@@ -73,6 +73,12 @@ def main(argv: list[str] | None = None) -> int:
     effects.to_csv(output, index=False)
     print(effects_summary(effects))
     print(f"Wrote {output}")
+    sensitivity = result["sensitivity"]
+    sensitivity_path = output.with_name(output.stem + "_sensitivity.csv")
+    sensitivity.to_csv(sensitivity_path, index=False)
+    print("Sensitivity check, DB tests without the 2024 class:")
+    print(effects_summary(sensitivity))
+    print(f"Wrote {sensitivity_path}")
     external = result["external"]
     if external["status"] == "computed":
         external_path = output.with_name(output.stem + "_external.csv")

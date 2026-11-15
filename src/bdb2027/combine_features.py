@@ -17,6 +17,7 @@ from bdb2027.preregistration import (
     DB_BACKPEDAL_DRILL_NAME,
     FALLBACK_DT_SECONDS,
     INITIAL_HEADING_FRAMES,
+    MAX_BREAK_TIME_S,
     MIN_ATTEMPT_FRAMES,
     RETENTION_WINDOW_SECONDS,
     START_SPEED_YPS,
@@ -66,8 +67,13 @@ def features_for_attempt(
     retention_window_s: float = RETENTION_WINDOW_SECONDS,
     initial_heading_frames: int = INITIAL_HEADING_FRAMES,
     min_frames: int = MIN_ATTEMPT_FRAMES,
+    max_break_time_s: float | None = MAX_BREAK_TIME_S,
 ) -> dict[str, float]:
-    """Kinematic summary for one drill attempt, already sorted by time."""
+    """Kinematic summary for one drill attempt, already sorted by time.
+
+    A break is only searched for within `max_break_time_s` of the attempt's
+    first frame (amendment A3). `None` turns the cap off.
+    """
     empty = {
         "n_frames": float(len(times_s)),
         "accel_peak": np.nan,
@@ -104,7 +110,11 @@ def features_for_attempt(
     origin = circular_mean_deg(heading_slice)
     delta = heading_delta_deg(direction, origin)
     after_start = np.arange(len(delta)) >= start_index
-    break_candidates = np.flatnonzero((delta >= break_heading_deg) & after_start)
+    in_window = np.ones(len(delta), dtype=bool)
+    if max_break_time_s is not None:
+        elapsed = np.asarray(times_s, dtype=float) - float(np.nanmin(times_s))
+        in_window = elapsed <= max_break_time_s + 1e-9
+    break_candidates = np.flatnonzero((delta >= break_heading_deg) & after_start & in_window)
     if break_candidates.size == 0:
         return empty
 

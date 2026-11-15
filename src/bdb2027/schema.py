@@ -221,6 +221,8 @@ PLAYER_PLAY_REQUIRED: tuple[str, ...] = (
     "target",
     "expected_points_added",
     "separation_at_pass_forward",
+    "team_abbr",
+    "coverage_assignment",
 )
 GAMES_REQUIRED: tuple[str, ...] = ("game_id", "season", "season_type", "week")
 CAREER_REQUIRED: tuple[str, ...] = (

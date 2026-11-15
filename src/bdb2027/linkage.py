@@ -4,6 +4,8 @@ The effect size is the Pearson correlation of within-class deviations. Class
 means are removed before the correlation, so a year that was timed or coded
 differently cannot create the association by itself. The interval treats
 players as independent after that demeaning; it is not a cluster-robust interval.
+Since amendment A4 (2026-11-15) the Fisher standard error is
+1 / sqrt(n - 3 - (k - 1)) for k draft classes.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from bdb2027.preregistration import (
     MIN_CLASS_PLAYERS,
     PREREGISTERED_TESTS,
     SMALL_N_THRESHOLD,
+    UNDERPOWERED_TESTS,
     PreRegisteredTest,
     bonferroni_alpha,
     family_size,
@@ -27,12 +30,15 @@ def _fisher_interval(
     correlation: float,
     n_players: int,
     z_critical: float = 1.96,
+    n_classes: int = 1,
 ) -> tuple[float, float]:
-    if n_players <= 3 or not np.isfinite(correlation):
+    extra_means = max(int(n_classes) - 1, 0)
+    dof = n_players - 3 - extra_means
+    if dof <= 0 or not np.isfinite(correlation):
         return (np.nan, np.nan)
     clipped = float(np.clip(correlation, -0.999999, 0.999999))
     z_value = np.arctanh(clipped)
-    standard_error = 1.0 / math.sqrt(n_players - 3)
+    standard_error = 1.0 / math.sqrt(dof)
     low = math.tanh(z_value - z_critical * standard_error)
     high = math.tanh(z_value + z_critical * standard_error)
     return (float(low), float(high))
@@ -86,7 +92,7 @@ def within_class_pearson(
         correlation = np.nan
     else:
         correlation = float(np.corrcoef(x_dev, y_dev)[0, 1])
-    ci_low, ci_high = _fisher_interval(correlation, n_players)
+    ci_low, ci_high = _fisher_interval(correlation, n_players, n_classes=int(class_sizes.shape[0]))
     result.update(
         {
             "n_players": n_players,
@@ -127,6 +133,7 @@ def evaluate_tests(
                 "question": test.question,
                 "family_size": family_size(),
                 "bonferroni_alpha": adjusted,
+                "underpowered": test.test_id in UNDERPOWERED_TESTS,
                 **stats,
             }
         )
