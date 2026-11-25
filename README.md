@@ -107,7 +107,11 @@ The assignment is the job that corner was given on the play. The team column is 
 
 A token that contains MAN and not a zone word is man (`MAN`, `MAN_MATCH`, `2_MAN`). A token that contains a zone word and not MAN is zone (`ZONE`, `DEEP_FREE`, `CURL_FLAT_LEFT`, and the same family: FLAT, HOOK, SEAM, QUARTER, HALF, THIRD, BRACKET, PALM). A token that names both, or neither (`MAN_ZONE`, `COVER_3`, `NO_ASSIGNMENT`), is `other` and is left out of the man and zone rows. The older retention robustness check is a different rule, exact `MAN` versus everything else, and it is unchanged.
 
-The table has one row per CB and coverage type with at least one credited target. It reports targets, completion rate allowed, EPA allowed, and separation allowed. Each cell has the raw mean and an empirical-Bayes shrinkage estimate. Completion uses a beta-binomial model. EPA and separation use a normal-normal model with a DerSimonian-Laird between-CB variance. The 95% intervals plug those hyperparameters in, so they do not include uncertainty about the prior itself. A row with fewer than 5 targets is flagged `meets_floor=False`. `small_n` is set below 20 targets, the same threshold as the pre-registered tables. The figure draws shrunk EPA for rows that meet the floor.
+The table has one row per CB and coverage type with at least one credited target. It reports targets, completion rate allowed, EPA allowed, and separation allowed. Each cell has the raw mean (`mean_epa`, `mean_separation`, `completion_rate`) beside the empirical-Bayes shrinkage estimate. Completion uses a beta-binomial model. EPA and separation use a normal-normal model with a DerSimonian-Laird between-CB variance, stored as `epa_tau2` and `separation_tau2`. The 95% intervals plug those hyperparameters in, so they do not include uncertainty about the prior itself.
+
+When that between-CB variance is estimated as 0, `epa_pooling` or `separation_pooling` is `complete`. Every CB in that coverage then has the same shrunk value and the same interval: the shared mean. A zone sample where corners look alike after within-play noise will do this, and the shrunk EPA column will be identical down the zone rows. The raw player mean in `mean_epa` is unchanged. The summary file counts those rows (`n_zone_epa_complete_pool` and the man and separation counterparts) and repeats the explanation in `complete_pool_note`. `partial` means the shrunk value is pulled toward the coverage mean but still differs by CB. The figure draws shrunk EPA for rows that meet the floor, so complete pooling stacks those points. Read `mean_epa` for the unpooled player value.
+
+A row with fewer than 5 targets is flagged `meets_floor=False`. `small_n` is set below 20 targets, the same threshold as the pre-registered tables.
 
 ### Threat probability
 
@@ -133,7 +137,7 @@ Plays with no `pass_forward` timestamp are dropped. Event names that record the 
 
 `--cb-exploratory` writes:
 
-- `outputs/effects_cb_coverage.csv` — the player-level man/zone table. Do not commit it.
+- `outputs/effects_cb_coverage.csv` — the player-level man/zone table, with raw means beside shrunk values and an `epa_pooling` flag (`complete` when tau^2 is 0). Do not commit it.
 - `outputs/effects_cb_coverage_audit.csv` — assignment strings, the man/zone/other label, and agreement with the team shell. No player ids.
 - `outputs/effects_cb_coverage_summary.csv` — the label choice, the floor, and the agreement rate.
 - `outputs/effects_cb_threat_effects.csv` — coefficients, odds ratios, and probability differences, with intervals.

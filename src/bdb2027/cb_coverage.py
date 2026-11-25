@@ -28,11 +28,18 @@ Uncertainty
 Each CB-coverage cell reports the raw mean and an empirical-Bayes shrinkage
 estimate. Completion uses a beta-binomial model. EPA and separation use a
 normal-normal model with a DerSimonian-Laird estimate of the between-CB
-variance. Intervals are 95% posterior intervals with the hyperparameters
-plugged in. They do not include uncertainty in the prior itself. A cell with
-fewer than ``MIN_CB_COVERAGE_TARGETS`` credited targets is kept in the table
-and flagged ``meets_floor=False``. ``small_n`` uses the same player-count
-threshold as the pre-registered tables.
+variance (``epa_tau2`` / ``separation_tau2``). Intervals are 95% posterior
+intervals with the hyperparameters plugged in. They do not include uncertainty
+in the prior itself.
+
+When that between-CB variance is estimated as 0, ``epa_pooling`` (or
+``separation_pooling``) is ``complete``: every CB in the coverage gets the same
+shrunk value and the same interval, the shared mean. The raw player mean stays
+in ``mean_epa`` or ``mean_separation``. Identical shrunk values are that case.
+
+A cell with fewer than ``MIN_CB_COVERAGE_TARGETS`` credited targets is kept
+in the table and flagged ``meets_floor=False``. ``small_n`` uses the same
+player-count threshold as the pre-registered tables.
 """
 
 from __future__ import annotations
@@ -46,6 +53,12 @@ from bdb2027.preregistration import SMALL_N_THRESHOLD
 
 MIN_CB_COVERAGE_TARGETS: int = 5
 INTERVAL_METHOD: str = "empirical_bayes_plug_in_95"
+COMPLETE_POOL_NOTE: str = (
+    "epa_pooling or separation_pooling equal to complete means the "
+    "DerSimonian-Laird between-CB variance (tau^2) is 0 for that coverage. "
+    "The shrunk value and its interval are then the shared mean for every CB "
+    "in the coverage. Player differences stay in mean_epa and mean_separation."
+)
 LABEL_SOURCE: str = "coverage_assignment"
 LABEL_ALTERNATIVE: str = "team_coverage_man_zone"
 LABEL_REASON: str = (
@@ -91,11 +104,15 @@ COVERAGE_COLUMNS: tuple[str, ...] = (
     "epa_shrunk",
     "epa_ci_low",
     "epa_ci_high",
+    "epa_tau2",
+    "epa_pooling",
     "n_separation",
     "mean_separation",
     "separation_shrunk",
     "separation_ci_low",
     "separation_ci_high",
+    "separation_tau2",
+    "separation_pooling",
     "meets_floor",
     "small_n",
     "label_source",
@@ -135,6 +152,11 @@ SUMMARY_COLUMNS: tuple[str, ...] = (
     "n_both_labeled",
     "n_label_agree",
     "agreement_rate",
+    "n_man_epa_complete_pool",
+    "n_zone_epa_complete_pool",
+    "n_man_separation_complete_pool",
+    "n_zone_separation_complete_pool",
+    "complete_pool_note",
     "exploratory",
     "preregistered",
 )
@@ -309,32 +331,54 @@ def _shrink_rates(successes: list[float], trials: list[float]) -> list[tuple[flo
     ]
 
 
-def _shrink_means(groups: list[np.ndarray]) -> list[tuple[float, float, float, float]]:
-    """Raw mean, shrunk mean, low, high. Empty groups yield NaNs."""
+def _pooling_label(tau2: float) -> str:
+    """``complete`` when between-CB variance is 0, so every CB shares one mean."""
+    if not np.isfinite(tau2):
+        return "unavailable"
+    if tau2 <= 1e-12:
+        return "complete"
+    return "partial"
+
+
+def _shrink_means(groups: list[np.ndarray]) -> list[tuple[float, float, float, float, float]]:
+    """Raw mean, shrunk mean, low, high, and the coverage's tau^2.
+
+    Empty groups yield NaNs. A tau^2 of 0 is complete pooling: the shrunk mean
+    is the shared mean for every non-empty group.
+    """
+    missing = (float("nan"), float("nan"), float("nan"), float("nan"), float("nan"))
     usable = [values for values in groups if values.size]
     if not usable:
-        return [(float("nan"), float("nan"), float("nan"), float("nan"))] * len(groups)
+        return [missing] * len(groups)
     mu0, tau2, sigma2 = _normal_hyperparameters(usable)
-    # When tau2 is 0, recompute the shared-mean standard error from every play.
+    # When tau2 is 0, the posterior is the shared mean. Its standard error uses
+    # every play in the coverage, and every CB receives that same interval.
     if tau2 <= 1e-12 and usable:
         total_n = float(sum(len(values) for values in usable))
         shared_sd = math.sqrt(sigma2 / total_n) if total_n else float("nan")
         results = []
         for values in groups:
             if values.size == 0:
-                results.append((float("nan"), float("nan"), float("nan"), float("nan")))
+                results.append(missing)
                 continue
             raw = float(np.mean(values))
             results.append(
-                (raw, float(mu0), float(mu0 - Z_95 * shared_sd), float(mu0 + Z_95 * shared_sd))
+                (
+                    raw,
+                    float(mu0),
+                    float(mu0 - Z_95 * shared_sd),
+                    float(mu0 + Z_95 * shared_sd),
+                    0.0,
+                )
             )
         return results
     results = []
     for values in groups:
         if values.size == 0:
-            results.append((float("nan"), float("nan"), float("nan"), float("nan")))
+            results.append(missing)
             continue
-        results.append(_normal_posterior(values, mu0, tau2, sigma2))
+        raw, shrunk, low, high = _normal_posterior(values, mu0, tau2, sigma2)
+        results.append((raw, shrunk, low, high, float(tau2)))
     return results
 
 
@@ -425,8 +469,8 @@ def cb_coverage_table(
         by_coverage[coverage].append(index)
 
     completion_out: list[tuple[float, float, float] | None] = [None] * len(cells)
-    epa_out: list[tuple[float, float, float, float] | None] = [None] * len(cells)
-    sep_out: list[tuple[float, float, float, float] | None] = [None] * len(cells)
+    epa_out: list[tuple[float, float, float, float, float] | None] = [None] * len(cells)
+    sep_out: list[tuple[float, float, float, float, float] | None] = [None] * len(cells)
     for coverage, indexes in by_coverage.items():
         if not indexes:
             continue
@@ -452,8 +496,8 @@ def cb_coverage_table(
         n_completions = int(group["is_completion"].sum())
         rate = n_completions / n_targets if n_targets else float("nan")
         shrunk_rate, rate_low, rate_high = completion_out[index] or (float("nan"),) * 3
-        epa_raw, epa_shrunk, epa_low, epa_high = epa_out[index] or (float("nan"),) * 4
-        sep_raw, sep_shrunk, sep_low, sep_high = sep_out[index] or (float("nan"),) * 4
+        epa_raw, epa_shrunk, epa_low, epa_high, epa_tau2 = epa_out[index] or (float("nan"),) * 5
+        sep_raw, sep_shrunk, sep_low, sep_high, sep_tau2 = sep_out[index] or (float("nan"),) * 5
         name = ""
         draft_year: object = np.nan
         if nfl_id in lookup.index:
@@ -476,11 +520,15 @@ def cb_coverage_table(
                 "epa_shrunk": epa_shrunk,
                 "epa_ci_low": epa_low,
                 "epa_ci_high": epa_high,
+                "epa_tau2": epa_tau2,
+                "epa_pooling": _pooling_label(epa_tau2),
                 "n_separation": int(group["separation"].notna().sum()),
                 "mean_separation": sep_raw,
                 "separation_shrunk": sep_shrunk,
                 "separation_ci_low": sep_low,
                 "separation_ci_high": sep_high,
+                "separation_tau2": sep_tau2,
+                "separation_pooling": _pooling_label(sep_tau2),
                 "meets_floor": n_targets >= min_targets,
                 "small_n": n_targets < SMALL_N_THRESHOLD,
                 "label_source": LABEL_SOURCE,
@@ -566,6 +614,13 @@ def cb_coverage_summary(
         n_man_floor = int((table["coverage"].eq("man") & floor).sum())
         n_zone_floor = int((table["coverage"].eq("zone") & floor).sum())
     agreement = n_agree / n_both if n_both else float("nan")
+
+    def _pool_rows(coverage: str, column: str) -> int:
+        if table.empty or column not in table.columns:
+            return 0
+        mask = table["coverage"].eq(coverage) & table[column].astype("string").eq("complete")
+        return int(mask.sum())
+
     row = {
         "label_source": LABEL_SOURCE,
         "alternative_not_used": LABEL_ALTERNATIVE,
@@ -587,6 +642,11 @@ def cb_coverage_summary(
         "n_both_labeled": n_both,
         "n_label_agree": n_agree,
         "agreement_rate": agreement,
+        "n_man_epa_complete_pool": _pool_rows("man", "epa_pooling"),
+        "n_zone_epa_complete_pool": _pool_rows("zone", "epa_pooling"),
+        "n_man_separation_complete_pool": _pool_rows("man", "separation_pooling"),
+        "n_zone_separation_complete_pool": _pool_rows("zone", "separation_pooling"),
+        "complete_pool_note": COMPLETE_POOL_NOTE,
         "exploratory": True,
         "preregistered": False,
     }

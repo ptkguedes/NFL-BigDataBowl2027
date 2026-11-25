@@ -192,6 +192,12 @@ def _write_cb_exploratory(output: Path, cb: dict) -> None:
         f"{int(summary['n_cbs_in_table'])} CBs in the table; "
         f"shell agreement {summary['agreement_rate']}"
     )
+    print(
+        "  complete pooling (tau^2 = 0; shrunk value is the shared mean, "
+        "raw mean is mean_epa / mean_separation): "
+        f"man EPA rows {int(summary['n_man_epa_complete_pool'])}, "
+        f"zone EPA rows {int(summary['n_zone_epa_complete_pool'])}"
+    )
     print(f"Wrote {coverage_path}")
     print(f"Wrote {audit_path}")
     print(f"Wrote {summary_path}")

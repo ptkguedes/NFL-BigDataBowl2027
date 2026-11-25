@@ -25,6 +25,7 @@ from bdb2027.threat import (  # noqa: E402
     closing_speed,
     fit_logistic,
     fit_threat_model,
+    frame_seconds,
     is_post_outcome_event,
     matchup_features,
 )
@@ -124,6 +125,8 @@ def test_cb_table_shrinks_and_drops_safeties() -> None:
     # Partial pooling pulls the high-EPA corner toward the other man corner.
     assert 0 < man["epa_shrunk"] < man["mean_epa"]
     assert man["epa_ci_low"] < man["epa_shrunk"] < man["epa_ci_high"]
+    assert man["epa_pooling"] == "partial"
+    assert man["mean_epa"] != man["epa_shrunk"]
     assert man["exploratory"]
     assert not man["preregistered"]
     assert man["label_source"] == "coverage_assignment"
@@ -176,6 +179,116 @@ def test_closing_speed_uses_ngs_axes_and_ignores_later_frames() -> None:
     # No pass_forward timestamp: the throw time is unknown, so the play is unusable.
     untagged = frames.loc[~frames["event"].eq("pass_forward")]
     assert matchup_features(untagged, 7, 100) is None
+
+
+def test_microsecond_datetimes_keep_a_half_second_lookback() -> None:
+    """Pandas 3 stores to_datetime results as datetime64[us].
+
+    The integer view of that dtype is microseconds. Dividing it by 1e9 reads
+    the units as nanoseconds, so 0.5 s becomes 0.0005 s and the lookback is
+    dropped. This fixture is microseconds on purpose.
+    """
+    stamps = pd.to_datetime(
+        [
+            "2024-09-08T17:00:00.000000Z",
+            "2024-09-08T17:00:00.500000Z",
+            "2024-09-08T17:00:01.000000Z",
+        ],
+        utc=True,
+    ).astype("datetime64[us, UTC]")
+    assert str(stamps.dtype).startswith("datetime64[us")
+    seconds = frame_seconds(pd.Series(stamps))
+    assert seconds[1] - seconds[0] == pytest.approx(0.5)
+    assert seconds[2] - seconds[0] == pytest.approx(1.0)
+    # The nanosecond misread of a microsecond clock is three orders smaller.
+    assert seconds[1] - seconds[0] > 0.1
+    numeric = frame_seconds(pd.Series([0.0, 0.5, 1.0]))
+    assert numeric[1] == pytest.approx(0.5)
+    as_text = pd.Series(
+        [
+            "2024-09-08T17:00:00.000000Z",
+            "2024-09-08T17:00:00.500000Z",
+            "2024-09-08T17:00:01.000000Z",
+        ]
+    )
+    text_seconds = frame_seconds(as_text)
+    assert text_seconds[1] - text_seconds[0] == pytest.approx(0.5)
+    assert str(pd.to_datetime(as_text, utc=True).dtype).startswith("datetime64[us")
+
+    frames = pd.DataFrame(
+        [
+            _frame(1, 7, 0.0, 0.0, 2.0, "ball_snap", stamps[0]),
+            _frame(1, 100, 0.0, 10.0, 0.0, "ball_snap", stamps[0]),
+            _frame(1, 7, 0.0, 0.0, 5.0, "pass_forward", stamps[1]),
+            _frame(1, 100, 0.0, 10.0, 0.0, "pass_forward", stamps[1]),
+        ]
+    )
+    frames["time"] = pd.Series(
+        [stamps[0], stamps[0], stamps[1], stamps[1]],
+        dtype="datetime64[us, UTC]",
+    )
+    assert str(frames["time"].dtype).startswith("datetime64[us")
+    matchups = build_matchups(frames, _one_assignment(), pd.DataFrame())
+    assert len(matchups) == 1
+    assert matchups.iloc[0]["cb_speed"] == pytest.approx(5.0)
+    assert matchups.iloc[0]["cb_speed_change"] == pytest.approx(3.0)
+
+
+def _one_assignment() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "game_id": 1,
+                "play_id": 1,
+                "defender_nfl_id": 7,
+                "receiver_nfl_id": 100,
+                "is_completion": False,
+            }
+        ]
+    )
+
+
+def test_zero_between_cb_variance_pools_shrunk_epa() -> None:
+    """A 0.05 EPA gap inside unit noise has tau^2 = 0, so shrunk EPA is shared.
+
+    The raw means stay on the row and still differ.
+    """
+    rows = []
+    play = 0
+    for defender, low, high, sep_low, sep_high in (
+        (7, -1.0, 1.0, 1.0, 2.0),
+        (9, -0.95, 1.05, 5.0, 6.0),
+    ):
+        for _ in range(50):
+            for epa, separation in ((low, sep_low), (high, sep_high)):
+                rows.append(
+                    {
+                        "game_id": 1,
+                        "play_id": play,
+                        "defender_nfl_id": defender,
+                        "receiver_nfl_id": 100,
+                        "coverage_assignment": "ZONE",
+                        "is_completion": False,
+                        "expected_points_added": epa,
+                        "separation_allowed": separation,
+                    }
+                )
+                play += 1
+    table = cb_coverage_table(pd.DataFrame(rows), PLAYERS).set_index("nfl_id")
+    assert set(table["epa_pooling"]) == {"complete"}
+    assert table["epa_tau2"].eq(0).all()
+    assert table["epa_shrunk"].nunique() == 1
+    assert table.loc[7, "mean_epa"] == pytest.approx(0.0)
+    assert table.loc[9, "mean_epa"] == pytest.approx(0.05)
+    assert table.loc[7, "epa_shrunk"] == pytest.approx(0.025)
+    assert table.loc[7, "mean_epa"] != pytest.approx(table.loc[7, "epa_shrunk"])
+    assert set(table["separation_pooling"]) == {"partial"}
+    assert table.loc[7, "separation_shrunk"] < table.loc[9, "separation_shrunk"]
+    summary = cb_coverage_summary(pd.DataFrame(rows), table.reset_index()).iloc[0]
+    assert summary["n_zone_epa_complete_pool"] == 2
+    assert summary["n_zone_separation_complete_pool"] == 0
+    assert "mean_epa" in summary["complete_pool_note"]
+    assert "tau^2" in summary["complete_pool_note"]
 
 
 def _frame(
