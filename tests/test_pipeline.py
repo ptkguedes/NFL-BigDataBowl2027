@@ -333,6 +333,7 @@ def test_cli_writes_effects(tmp_path: Path) -> None:
     assert len(written) == 6
     assert (tmp_path / "effects_sensitivity.csv").is_file()
     assert not (tmp_path / "effects_robustness.csv").exists()
+    assert not (tmp_path / "effects_cb_coverage.csv").exists()
     code = main(["--data-dir", str(data_dir), "--output", str(output), "--robustness"])
     assert code == 0
     robustness = pd.read_csv(tmp_path / "effects_robustness.csv")

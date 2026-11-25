@@ -62,6 +62,21 @@ def build_parser() -> argparse.ArgumentParser:
             "Aggregates only. Not pre-registered."
         ),
     )
+    parser.add_argument(
+        "--cb-exploratory",
+        action="store_true",
+        help=(
+            "Also write CB-only man/zone tables and the exploratory threat model. "
+            "Not pre-registered. The six-test family is unchanged. "
+            "The player-level coverage table is not for redistribution."
+        ),
+    )
+    parser.add_argument(
+        "--cb-bootstrap-draws",
+        type=int,
+        default=200,
+        help="Cluster-bootstrap draws for the threat-model intervals. Default: 200.",
+    )
     return parser
 
 
@@ -136,7 +151,66 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote {external_path}")
     else:
         print(external["reason"] or SKIPPED_REASON)
+    if args.cb_exploratory:
+        if args.cb_bootstrap_draws < 0:
+            print("error: --cb-bootstrap-draws must be zero or positive", file=sys.stderr)
+            return 1
+        from bdb2027.pipeline import run_cb_exploratory
+
+        try:
+            cb = run_cb_exploratory(
+                data_dir,
+                assignments=result["assignments"],
+                n_bootstrap=args.cb_bootstrap_draws,
+            )
+        except (DataLayoutError, SchemaError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        _write_cb_exploratory(output, cb)
     return 0
+
+
+def _write_cb_exploratory(output: Path, cb: dict) -> None:
+    """Write the exploratory CB tables. Play-level matchups are not written."""
+    coverage_path = output.with_name(output.stem + "_cb_coverage.csv")
+    audit_path = output.with_name(output.stem + "_cb_coverage_audit.csv")
+    summary_path = output.with_name(output.stem + "_cb_coverage_summary.csv")
+    effects_path = output.with_name(output.stem + "_cb_threat_effects.csv")
+    calibration_path = output.with_name(output.stem + "_cb_threat_calibration.csv")
+    metrics_path = output.with_name(output.stem + "_cb_threat_metrics.csv")
+    cb["coverage"].to_csv(coverage_path, index=False)
+    cb["coverage_audit"].to_csv(audit_path, index=False)
+    cb["coverage_summary"].to_csv(summary_path, index=False)
+    cb["threat_effects"].to_csv(effects_path, index=False)
+    cb["threat_calibration"].to_csv(calibration_path, index=False)
+    cb["threat_metrics"].to_csv(metrics_path, index=False)
+    summary = cb["coverage_summary"].iloc[0]
+    print("Exploratory CB coverage (not pre-registered):")
+    print(
+        "  label source: "
+        f"{summary['label_source']}; floor {int(summary['min_targets_floor'])} targets; "
+        f"{int(summary['n_cbs_in_table'])} CBs in the table; "
+        f"shell agreement {summary['agreement_rate']}"
+    )
+    print(f"Wrote {coverage_path}")
+    print(f"Wrote {audit_path}")
+    print(f"Wrote {summary_path}")
+    metrics = cb["threat_metrics"].iloc[0]
+    print("Exploratory CB threat model (completion, not pre-registered):")
+    print(
+        "  "
+        f"matchups {int(metrics['n_matchups'])}, CBs {int(metrics['n_cbs'])}, "
+        f"threat rate {metrics['threat_rate']}, "
+        f"grouped-CV Brier {metrics['brier_grouped_cv']} "
+        f"vs intercept-only {metrics['brier_baseline_grouped_cv']}"
+    )
+    effects = cb["threat_effects"]
+    if not effects.empty:
+        show = effects.loc[:, ["term", "coef", "ci_low", "ci_high", "mean_risk_difference"]]
+        print(show.to_string(index=False))
+    print(f"Wrote {effects_path}")
+    print(f"Wrote {calibration_path}")
+    print(f"Wrote {metrics_path}")
 
 
 if __name__ == "__main__":

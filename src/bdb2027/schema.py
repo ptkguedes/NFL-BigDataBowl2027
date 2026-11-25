@@ -238,3 +238,30 @@ GAME_TRACKING_REQUIRED: tuple[str, ...] = (
     "y",
     "event",
 )
+
+# Exploratory CB analyses. These are not added to the required tuples above,
+# so the pre-registered loaders still accept the original column set.
+COMBINE_TRAITS_COLUMNS: tuple[str, ...] = (
+    "nfl_id",
+    "wing_span",
+    "broad_jump",
+    "vertical",
+)
+PLAYER_PLAY_SHELL_COLUMNS: tuple[str, ...] = (
+    "game_id",
+    "play_id",
+    "team_coverage_man_zone",
+)
+GAME_TRACKING_KINEMATICS: tuple[str, ...] = (
+    "game_id",
+    "play_id",
+    "nfl_id",
+    "time",
+    "x",
+    "y",
+    "s",
+    "a",
+    "o",
+    "dir",
+    "event",
+)

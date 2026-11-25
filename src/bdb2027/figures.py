@@ -110,3 +110,112 @@ def figure_forest(effects: pd.DataFrame, robustness: pd.DataFrame | None = None,
     ax.set_title("Figure 2. Pre-registered family (blue) and retention checks (orange)")
     fig.tight_layout()
     return fig
+
+
+def _cb_axis_label(row: pd.Series) -> str:
+    name = str(row["display_name"]).strip()
+    if not name or name in {"<NA>", "nan", "None"}:
+        name = str(int(row["nfl_id"]))
+    year = row["draft_year"]
+    if pd.notna(year):
+        return f"{name} ({int(year)})"
+    return name
+
+
+def figure_cb_coverage(table: pd.DataFrame, ax=None):
+    """Exploratory dot plot of shrunk EPA allowed for CBs who meet the target floor.
+
+    Man and zone are separate points. The bar is the plugged-in 95% posterior
+    interval. Nothing is written unless the caller saves the figure. One point
+    per CB, so do not export it outside the Kaggle notebook.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    if ax is None:
+        if table.empty:
+            n_cbs = 0
+        else:
+            meeting = table.loc[table["meets_floor"].astype(bool), "nfl_id"]
+            n_cbs = int(meeting.nunique())
+        fig, ax = plt.subplots(figsize=(7.2, max(3.2, 0.42 * max(n_cbs, 1) + 1.2)))
+    else:
+        fig = ax.figure
+    plot = table.iloc[0:0] if table.empty else table.loc[table["meets_floor"].astype(bool)].copy()
+    if plot.empty:
+        ax.set_title("Exploratory. No CB met the man/zone target floor")
+        ax.set_xlabel("Shrunk EPA allowed per credited target")
+        fig.tight_layout()
+        return fig
+
+    order: list[tuple[float, int]] = []
+    for nfl_id, group in plot.groupby("nfl_id", sort=False):
+        man = group.loc[group["coverage"].eq("man"), "epa_shrunk"]
+        zone = group.loc[group["coverage"].eq("zone"), "epa_shrunk"]
+        anchor = float(man.iloc[0]) if not man.empty else float(zone.iloc[0])
+        if not np.isfinite(anchor):
+            anchor = float("inf")
+        order.append((anchor, int(nfl_id)))
+    order.sort()
+    colors = {"man": "tab:blue", "zone": "tab:orange"}
+    labels = []
+    for position, (_, nfl_id) in enumerate(order):
+        group = plot.loc[plot["nfl_id"].eq(nfl_id)]
+        labels.append(_cb_axis_label(group.iloc[0]))
+        endpoints = []
+        for _, row in group.iterrows():
+            color = colors.get(str(row["coverage"]), "0.4")
+            y_value = position
+            low = row["epa_ci_low"]
+            high = row["epa_ci_high"]
+            if np.isfinite(low) and np.isfinite(high):
+                ax.plot([low, high], [y_value, y_value], color=color, linewidth=2, alpha=0.85)
+            if np.isfinite(row["epa_shrunk"]):
+                ax.plot(row["epa_shrunk"], y_value, "o", color=color, markersize=6)
+                endpoints.append(float(row["epa_shrunk"]))
+        if len(endpoints) == 2:
+            ax.plot(endpoints, [position, position], color="0.75", linewidth=1, zorder=0)
+    ax.set_yticks(range(len(order)))
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Shrunk EPA allowed per credited target")
+    ax.set_title("Exploratory. CB EPA allowed in man (blue) and zone (orange)")
+    ax.legend(
+        handles=[
+            Line2D([0], [0], marker="o", color="tab:blue", label="man", linestyle="None"),
+            Line2D([0], [0], marker="o", color="tab:orange", label="zone", linestyle="None"),
+        ],
+        frameon=False,
+    )
+    fig.tight_layout()
+    return fig
+
+
+def figure_threat_effects(effects: pd.DataFrame, ax=None):
+    """Exploratory forest of threat-model log-odds per 1 SD. The intercept is omitted."""
+    import matplotlib.pyplot as plt
+
+    slopes = effects.iloc[0:0] if effects.empty else effects.loc[effects["term"].ne("intercept")]
+    slopes = slopes.iloc[::-1].reset_index(drop=True)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(7.2, 0.42 * max(len(slopes), 3) + 1.2))
+    else:
+        fig = ax.figure
+    if slopes.empty:
+        ax.set_title("Exploratory. Threat model was not fit")
+        ax.set_xlabel("Log-odds of a completion per 1 SD")
+        fig.tight_layout()
+        return fig
+    for index, row in slopes.iterrows():
+        low = row["ci_low"]
+        high = row["ci_high"]
+        if np.isfinite(low) and np.isfinite(high):
+            ax.plot([low, high], [index, index], color="tab:purple", linewidth=2)
+        if np.isfinite(row["coef"]):
+            ax.plot(row["coef"], index, "o", color="tab:purple")
+    ax.axvline(0, color="0.5", linewidth=0.8)
+    ax.set_yticks(range(len(slopes)))
+    ax.set_yticklabels(slopes["term"])
+    ax.set_xlabel("Log-odds of a completion per 1 SD")
+    ax.set_title("Exploratory. CB threat model (not pre-registered)")
+    fig.tight_layout()
+    return fig
