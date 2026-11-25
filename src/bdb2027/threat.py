@@ -185,18 +185,35 @@ def is_post_outcome_event(value: object) -> bool:
     return text in POST_THROW_EVENTS
 
 
-def frame_seconds(time_values: pd.Series) -> np.ndarray:
-    """Seconds for ordering frames inside a play.
+def _epoch_seconds(parsed: pd.Series) -> np.ndarray:
+    """Seconds since the Unix epoch. Uses timedelta, not the integer storage unit.
 
-    Numeric timestamps are kept. Datetimes become seconds since the Unix
-    epoch, so differences inside one play stay correct.
+    Pandas 2 stores ``datetime64[ns]`` and pandas 3 stores ``datetime64[us]``.
+    Dividing the integer view by 1e9 treats microseconds as nanoseconds, so a
+    0.1 s frame gap becomes 0.0001 s and the 0.5 s lookback falls outside the play.
     """
+    epoch = pd.Timestamp("1970-01-01", tz="UTC")
+    return (parsed - epoch).dt.total_seconds().to_numpy(dtype=float)
+
+
+def frame_seconds(time_values: pd.Series) -> np.ndarray:
+    """Seconds since the Unix epoch, for ordering frames inside a play.
+
+    Numeric timestamps are already seconds and are kept. Datetime values,
+    including a ``datetime64[us]`` column, are converted with
+    ``Series.dt.total_seconds``.
+    """
+    if time_values.empty:
+        return np.asarray([], dtype=float)
+    if pd.api.types.is_datetime64_any_dtype(time_values):
+        parsed = pd.to_datetime(time_values, utc=True, errors="coerce")
+        return _epoch_seconds(parsed)
     numeric = pd.to_numeric(time_values, errors="coerce")
     if float(numeric.notna().mean()) >= 0.8:
         return numeric.to_numpy(dtype=float)
     parsed = pd.to_datetime(time_values, utc=True, errors="coerce")
     if parsed.notna().any():
-        return parsed.astype("int64").to_numpy() / 1e9
+        return _epoch_seconds(parsed)
     return np.full(len(time_values), np.nan)
 
 
