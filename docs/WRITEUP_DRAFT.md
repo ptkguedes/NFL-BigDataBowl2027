@@ -8,136 +8,122 @@ Numbers in Part A match the 2026-11-25 re-run on `main` at `9a8b9eb`:
 
 That run confirmed the 2026-11-15 family, robustness, and scenario tables (amendments A1-A6) and fit the exploratory cornerback sections. Re-run before submitting and update every number. Do not commit the output CSVs, and do not add a per-player table.
 
-Track to select at submission: Open or University. University only if every member is an undergraduate. Leave the Grand Prize track empty unless that changes.
+The track choice is in Part B.
 
 <!-- SUBMISSION START -->
 
-# Holding speed through the break: Combine backpedal tracking and EPA allowed by rookie defensive backs
+# Holding speed through the break
 
-*Speed kept through the backpedal break is the only pre-registered test under 0.05/6. Break time and the tight-end tests miss that bar. Cornerback shrinkage and a completion model are exploratory.*
+*The back who comes out of the turn still fast gives up less offense. That is the one pre-registered result that passes a strict correction for running six tests. How fast he gets to the break does not.*
 
-## Summary
+## The finding
 
-We linked 10 Hz Combine tracking to regular-season coverage for the 2023-2025 draft classes. Defensive backs who kept more speed through the 45-degree backpedal break allowed less EPA per credited target. The pooled within-class correlation is r = -0.596 (95% interval -0.806 to -0.253, p = 0.00166, n = 26: 8 in 2023, 11 in 2024, 7 in 2025).
+We linked 10 Hz Combine tracking to regular-season coverage for the 2023-2025 draft classes. For each defensive back we took speed in the 0.3 seconds after the 45-degree break in the backpedal drill and divided by speed in the 0.3 seconds before it.
 
-That row is a secondary test in a family of six. The Bonferroni threshold is 0.05/6 = 0.0083, and this is the only row that clears it. The other five miss it. Time to the break shows no link to separation allowed. The tight-end tests are weak. Amendments A1-A6 came after the first run, and n is small, so the lead still needs a later class.
+A ratio of 1.10 means he comes out of the turn 10% faster than he went in. A ratio of 1.04 means 4% faster. Those are the top and bottom quarters of a draft class (75th and 25th percentile). On the field, 1.10 is the corner who stays in phase with the receiver at the break. 1.04 is the corner who gives up a step.
 
-## Data
+The outcome is expected points added (EPA): the change in the offense's expected points on the play. A target is credited to the closest opposing draftee who has a coverage assignment, if he is within 5 yards when the ball is thrown. Inside each draft class, more speed kept through the break goes with less EPA allowed. The correlation is r = -0.596 (95% interval -0.806 to -0.253, p = 0.00166, 26 backs: 8 in 2023, 11 in 2024, 7 in 2025).
 
-We used the nine competition files. Game tracking and `player_play.csv` cover only the 510 draftees, about three tracked players per throw. Outcomes use regular-season games only (`season_type` REG). Plays nullified by penalty are dropped. Comparisons stay inside a draft class, because Combine recording differs by year. The 2024 backpedal drill ends after about 6 seconds, against 10 to 12 seconds in 2023 and 2025.
+The high-retention back allows 0.32 fewer expected points per credited target than the low-retention back (interval -0.49 to -0.18). Over an assumed 60 targets, a full starter's year, that is about 19 expected points (interval -29 to -11), roughly three touchdowns' worth. These files only credit draftee-on-draftee throws, a median of 5 per back, and at that volume the gap is 1.6 expected points. Treat 19 as an upper bound. It should shrink on a new class.
 
-## Measures
+The gap is a man-coverage result. In man it is 0.59 expected points per target, about 36 over 60 targets. In zone it is 0.18 per target and the interval includes no difference.
 
-**Break.** Breaks are not labeled. The break is the first frame, after the athlete passes 1 yd/s, where travel direction has turned 45 degrees from the opening heading. The search stops at 5.5 seconds in every year, so 2024 is not penalized for a short file. An attempt with no break by then is censored at 5.5 seconds and ranks slowest. A player's value is the median over his attempts.
+A high-retention rookie beats his class median about two times in three (probability 0.68). A low-retention rookie does so about one time in three (0.34).
 
-**Speed retention.** Median speed in the 0.3 seconds after the break, divided by median speed in the 0.3 seconds before it. It exists only for detected breaks.
+This was one of six tests written down in advance, and the only one that passes a strict correction for running all six (the bar is 0.05 divided by 6). The definitions were rewritten after the first look at the data, and 26 players is a small sample. It is a lead to check on the next class.
 
-**Coverage credit.** A targeted draftee receiver is credited to the closest opposing draftee DB with an active `coverage_assignment`, if that DB is within 5 yards at `pass_forward`. The credit carries the play's EPA, the completion, and the receiver's `separation_at_pass_forward`. A DB enters the tests with at least 5 credited targets.
+**Figure 1.** Placeholder, drawn in the notebook and not stored here. One point per back: speed kept through the break against EPA allowed, after removing the draft-class average.
 
-## Method
+## The other five tests
 
-Inside each draft class we demean the predictor and the outcome, then correlate the deviations. The two break-time tests rank both variables inside the class first (pooled within-class Spearman), so censored players tie at the slowest rank. Intervals are Fisher intervals that spend one degree of freedom per class mean removed. Spearman rows use the 1.06 variance factor. Table 1 is the family the notebook prints from `effects_summary`. "Clears 0.05/6" means two-sided p below 0.0083.
+Comparisons are made inside a draft class, because the Combine tapes differ by year. The 2024 backpedal file ends after about 6 seconds. The 2023 and 2025 files run 10 to 12 seconds. A break is the first frame, after the athlete passes 1 yard per second, where his direction has turned 45 degrees. The search stops at 5.5 seconds in every year. Players who never break by then, 21 of 47 on the break tests, tie at the slow end. Those two tests use ranks for that reason. The other tests use the values themselves. A back needs at least 5 credited targets to enter. Plays wiped out by penalty are dropped, and only regular-season games count.
 
-**Table 1. Pre-registered family after amendments A1-A6.**
+**Table 1. Six pre-registered tests.** "Passes" means the p-value is under 0.05/6.
 
-| Test | Method | r | 95% interval | p | n | Clears 0.05/6 |
-| --- | --- | --- | --- | --- | --- | --- |
-| TE: harder brake -> separation | Pearson | 0.164 | -0.300, 0.566 | 0.495 | 22 | No |
-| TE: faster 10-yard split -> separation | Pearson | 0.084 | -0.398, 0.530 | 0.744 | 20 | No |
-| TE: faster 3-cone -> completion (underpowered) | Pearson | 0.748 | -0.163, 0.970 | 0.094 | 7 | No |
-| DB: quicker break -> separation allowed | Spearman | -0.019 | -0.319, 0.285 | 0.907 | 47 | No |
-| DB: speed retention -> EPA allowed | Pearson | -0.596 | -0.806, -0.253 | 0.00166 | 26 | Yes |
-| DB: quicker break -> completion rate allowed | Spearman | 0.222 | -0.085, 0.491 | 0.155 | 47 | No |
+| Test | r | 95% interval | p | Players | Passes |
+| --- | --- | --- | --- | --- | --- |
+| TE: harder brake -> separation | 0.164 | -0.300, 0.566 | 0.495 | 22 | No |
+| TE: faster 10-yard split -> separation | 0.084 | -0.398, 0.530 | 0.744 | 20 | No |
+| TE: faster 3-cone -> completion (7 players) | 0.748 | -0.163, 0.970 | 0.094 | 7 | No |
+| DB: quicker break -> separation allowed | -0.019 | -0.319, 0.285 | 0.907 | 47 | No |
+| DB: speed through the break -> EPA allowed | -0.596 | -0.806, -0.253 | 0.00166 | 26 | Yes |
+| DB: quicker break -> completion rate allowed | 0.222 | -0.085, 0.491 | 0.155 | 47 | No |
 
-The break-time rows censor 21 of 47 players. Retention has no censored players. The 3-cone row is 7 players in 2 classes.
+Quicker breaks do not bring tighter coverage, and they do not bring fewer completions. The completion row points the other way. The tight-end tests miss the bar. The 3-cone row is too small to read.
 
-## Defensive backs: speed retention and EPA allowed
+## How fragile the lead is
 
-**Figure 1.** Placeholder, drawn at runtime by `figure_retention_scatter` (notebook section "Figure 1") and not stored in the repo. Within-class speed retention against EPA allowed per credited target, one point per DB, colored by draft class. The line is the pooled within-class slope.
+**Table 2. Retention against EPA allowed, under a few cuts.** The notebook has the other checks, including dropping any one player.
 
-Table 2 is the fragility check, outside the family of six. Digits match `robustness.round(3)`.
-
-**Table 2. Robustness of retention -> EPA allowed.**
-
-| Check | r | 95% interval | n |
+| Check | r | 95% interval | Players |
 | --- | --- | --- | --- |
-| Main row | -0.596 | -0.806, -0.253 | 26 |
-| Within-class Spearman | -0.544 | -0.782, -0.168 | 26 |
-| Without 2023 | -0.650 | -0.862, -0.247 | 18 |
-| Without 2024 | -0.652 | -0.879, -0.186 | 15 |
-| Without 2025 | -0.414 | -0.738, 0.065 | 19 |
-| Bootstrap within class (2,000 draws) | -0.596 | -0.861, -0.292 | 26 |
-| Range if any one player is removed | -0.707 to -0.521 | | 26 |
+| Main result | -0.596 | -0.806, -0.253 | 26 |
+| Drop 2023 | -0.650 | -0.862, -0.247 | 18 |
+| Drop 2024 | -0.652 | -0.879, -0.186 | 15 |
+| Drop 2025 | -0.414 | -0.738, 0.065 | 19 |
 | At least 10 credited targets | -0.431 | -0.794, 0.157 | 14 |
-| Man targets only (exact MAN, at least 3) | -0.647 | -0.847, -0.286 | 22 |
-| Zone targets only (non-MAN, at least 3) | -0.261 | -0.622, 0.193 | 23 |
+| Man targets | -0.647 | -0.847, -0.286 | 22 |
+| Zone targets | -0.261 | -0.622, 0.193 | 23 |
 
-The sign stays negative, and dropping any one player leaves r between -0.707 and -0.521. Without 2024 the interval still excludes zero (r = -0.652, n = 15, p = 0.0097), and that p-value misses 0.0083. Without 2025 the interval crosses zero (r = -0.414, n = 19), as it does at a 10-target floor (r = -0.431, n = 14). The association sits in exact-MAN targets (r = -0.647, n = 22). The zone row is every other assignment and crosses zero (r = -0.261, n = 23). Exploratory labels below use a different rule.
+Dropping 2024 still excludes zero, but p = 0.0097 misses the six-test bar (15 players). Dropping 2025, and requiring 10 targets, the interval includes zero. Man means an exact man tag and at least 3 targets. Zone means every other tag. Dropping any one player does not flip the sign.
 
-The family pools CB, SS, FS, DB, and S. Of these 26 players, 20 are cornerbacks and 6 are safeties. Cornerbacks alone: r = -0.640 (95% interval -0.852 to -0.246, p = 0.0033, n = 20: 5 in 2023, 10 in 2024, 5 in 2025). That filter is outside Table 2. Safeties alone are too few. Dropping 2025, the cornerback interval crosses zero (r = -0.384, n = 15, p = 0.18). Dropping 2024 leaves n = 10 (r = -0.766, p = 0.013).
+Twenty of the 26 backs are cornerbacks, and six are safeties. Among cornerbacks alone the correlation is r = -0.640 (interval -0.852 to -0.246, p = 0.0033, 20 players). The safeties are too few to estimate on their own.
 
-**Figure 2.** Placeholder, drawn at runtime by `figure_forest` (notebook section "Figure 2"). Fisher intervals for the six family tests and the Table 2 checks. The leave-one-player bar is the range of r.
+**Table 3. High retention (about 1.10) minus low retention (about 1.04).** Negative means the high-retention back allows fewer expected points. Ranges are 90%. Sixty targets is an assumed starter year, not a count from these files.
 
-## Probabilities and scenarios
-
-We resampled players within each class 4,000 times: a bootstrap approximation to a flat-prior posterior. Each draw refits the within-class slope of EPA allowed on retention, then compares the within-class 75th percentile of retention (raw value about 1.10) with the 25th (about 1.04). A "season" assumes 60 targets, a full-time starter's volume, which these files do not count. Credited targets are draftee-on-draftee only (median 5 per DB-season). Bands are 90%. The notebook prints `scenarios.round(3)`.
-
-**Table 3. Retention scenarios (bootstrap posterior, 90% bands).**
-
-| Quantity | All targets (n 26) | Man only (n 22) | Zone only (n 23) |
+| | All (26) | Man (22) | Zone (23) |
 | --- | --- | --- | --- |
-| P(slope below zero) | 1.000 | 0.998 | 0.924 |
-| P(75th percentile allows less EPA/target than class median) | 0.681 (0.555-0.837) | 0.688 (0.538-0.854) | 0.578 (0.435-0.746) |
-| P(25th percentile allows less EPA/target than class median) | 0.336 (0.163-0.480) | 0.246 (0.085-0.426) | 0.433 (0.305-0.547) |
-| EPA/target, high minus low retention | -0.319 (-0.488 to -0.175) | -0.593 (-0.952 to -0.219) | -0.184 (-0.440 to 0.024) |
-| EPA per 60 targets, high minus low | -19.2 (-29.3 to -10.5) | -35.6 (-57.1 to -13.1) | -11.1 (-26.4 to 1.5) |
+| Expected points per target | -0.32 (-0.49 to -0.18) | -0.59 (-0.95 to -0.22) | -0.18 (-0.44 to 0.02) |
+| Expected points over 60 targets | -19 (-29 to -11) | -36 (-57 to -13) | -11 (-26 to 1) |
 
-A high-retention rookie beats his class median with probability 0.681, and a low-retention rookie with probability 0.336. The 60-target gap should shrink on new players: nothing here is shrunk, and the lead was fit after amendments. At the observed credited volume the gap is -1.60 EPA per season (-2.44 to -0.88).
+**Figure 2.** Placeholder, drawn in the notebook. Intervals for the six tests and for every retention check, including the ones left out of Table 2.
 
-## Defensive backs: time to the break
+Backs who never break by 5.5 seconds line up about half a yard deeper (0.57 yards on credited targets, 6.2 against 5.6, p = 0.18; 0.45 yards on all snaps, p = 0.27). More of them are safeties (38% against 23%, p = 0.35). That is weak support, not an explanation.
 
-Quicker breaks show no link to separation allowed (Spearman r = -0.019, p = 0.907, n = 47). The completion row has the opposite sign to the one we expected (r = 0.222, interval -0.085 to 0.491, p = 0.155). Both miss 0.05/6. In these tests, 21 of 47 DBs are censored at 5.5 seconds and tie at the slowest rank.
+## Exploratory: man and zone
 
-Pre-snap `cushion` is only weak support for "slow breakers line up deeper." Within class they line up 0.57 yards deeper on credited targets (6.2 yards against 5.6, permutation p = 0.18) and 0.45 yards deeper on all snaps (p = 0.27). The censored group has more safeties (38% against 23%, p = 0.35).
+This was not one of the six tests. It keeps cornerbacks only and splits on the corner's own assignment. That label agrees with the team shell on 87.9% of throws (579 of 659). There are 42 corners and 660 targets: 358 man, 301 zone, and 1 other.
 
-## Tight ends
+When a corner has few targets, his average is pulled toward the group so one noisy game does not dominate. In man, corners still differ after that pull. In zone, the pull is complete: every corner gets the same adjusted EPA, 0.16, and the differences that remain are the raw averages. No corner's range sits entirely on one side of zero. Do not rank zone corners from the adjusted number.
 
-All three miss 0.05/6. Braking (r = 0.164, p = 0.495, n = 22) and the 10-yard split (r = 0.084, p = 0.744, n = 20) have wide intervals. The 3-cone row is underpowered (r = 0.748, p = 0.094, n = 7).
+## Exploratory: what changes a completion
 
-## Exploratory: man and zone among cornerbacks
+This was not one of the six tests. On 486 throws to 32 corners with a full look at the release, 53.7% were completed (261 of 486). The model uses only what is known when the ball comes out: the gap, whether that gap is closing, the corner's speed and acceleration, and his wing span, broad jump, and vertical. A "typical" change below is one standard deviation in this sample, turned into percentage points of completion probability. The ranges resample corners.
 
-Outside the family of six. Players are `nfl_position == CB`. The split is the corner's `coverage_assignment`. `team_coverage_man_zone` is an agreement audit only. Tokens that name both man and zone, or neither, stay out. Shrinkage is empirical Bayes (beta-binomial for completion rate, normal-normal for EPA and separation, DerSimonian-Laird tau^2). The floor is 5 targets in that coverage. Aggregates only: no corner is named.
+The average gap at the throw is 2.5 yards. A typical extra 1.3 yards of separation raises the chance the pass is completed by about 13 points (9 to 16). Spread across those 1.3 yards, that is about 10 points per extra yard.
 
-Forty-two cornerbacks, 660 targets (358 man, 301 zone, 1 other). Agreement with the team shell is 87.9% (579 of 659). The floor is met by 28 corners in man, 23 in zone, and 18 in both.
+Closing the gap faster by a typical amount, 2.3 yards per second (about 4.6 mph), lowers the completion chance by about 7 points (1 to 12). That is about 3 points per extra yard per second of closing speed.
 
-Man EPA is partial pooling (tau^2 = 0.149). Zone EPA is complete pooling (tau^2 = 0) on all 39 zone rows, so every zone row shares one shrunk EPA, 0.164, with interval [-0.015, 0.343]. Between-corner zone differences remain in the raw means. Separation stays partial in both coverages. No corner's shrunk-EPA interval lies entirely on one side of zero.
+A typical increase in the corner's acceleration at the throw raises the completion chance by about 6 points (1 to 11). The tracking file does not give that acceleration a coaching unit beyond the recorded magnitude, so this one stays as a typical change, not a per-yard figure.
 
-## Exploratory: completion on a credited target
+Wing span, broad jump, vertical, hip angle, path angle, speed, and the change in speed over the previous half-second all have ranges that include no effect. Once the throw is on tape, those Combine measurables do not add a completion signal.
 
-Outside the family of six. The outcome is `pass_result` C. The model is L2-penalized logistic regression with a player intercept. Slopes are log-odds per 1 SD. Features stop at `pass_forward`: separation, closing speed, hip error, motion error, speed, acceleration magnitude, and speed change over about 0.5 s, plus wing span, broad jump, and vertical. Lambda is 1.0, from player-grouped cross-validation. Intervals are a 200-draw cluster bootstrap (seed 2027).
+The model is only a little sharper than guessing the overall 54% completion rate. It is off at the extremes: throws it calls unlikely are completed much more often than it expects, and throws it calls likely are completed a bit less often. The bin-by-bin check is in the notebook. Do not use the raw probabilities as odds.
 
-Of 660 credited targets, 486 are complete (174 dropped) on 32 cornerbacks. The completion rate is 53.7% (261 of 486). Grouped CV beats an intercept-only model by a small margin: Brier 0.239 against 0.250, log loss 0.678 against 0.694, ECE 0.064. The tails are off. Bin 1 (n = 49) predicts 0.21 and observes 0.45. Bin 10 (n = 48) predicts 0.85 and observes 0.73.
-
-Three intervals exclude zero: separation at the throw +0.62 [0.41, 0.89], closing speed -0.31 [-0.61, -0.05], CB acceleration +0.28 [0.03, 0.58]. Wing span, broad jump, vertical, hip error, motion error, speed, and speed change all cross zero. Those Combine body measures add no detectable signal beyond the tracking features in this fit.
-
-**Figure 3.** Placeholder. The notebook section "Exploratory figures" draws this at runtime; the repo stores no image. Panel A is `figure_cb_coverage`: shrunk EPA in man (blue) and zone (orange) for corners at the five-target floor, with the plugged-in 95% interval. One point per player, so it stays in the notebook. Panel B is `figure_threat_effects`: the log-odds forest above, intercept omitted.
+**Figure 3.** Placeholder, drawn in the notebook and not stored here. One panel is adjusted EPA in man and in zone, one point per corner, so it stays in the notebook. The other panel is the completion effects above.
 
 ## What a team could use
 
-If retention holds on a new class, it is cheap to compute from tracking teams already have, and it is a film tiebreaker for DBs who already break quickly. The threat model points the same way: geometry and closing speed at the throw move completion probability, and the Combine body measures in the model do not.
+Use this as a tiebreaker, not as a draft board.
 
-## Limitations
+A scout can compute it from tracking the club already gets at the Combine or a pro day. On the backpedal-to-break drill, divide speed out of the turn by speed into the turn. When two corners both break quickly on film and the rest of the card is close, prefer the one who comes out of the plant still fast: about 10% faster than he went in, rather than about 4%. Do not sort a class on this number alone. The sample is 26 rookies, the definitions were set after a first look, and the result weakens if the 2025 class is set aside or if only backs with 10 or more credited targets are kept.
 
-- Small n. The lead is 26 players. Without 2025 (n = 19) and at 10 targets (n = 14) the interval crosses zero. Without 2024 (n = 15, p = 0.0097) it misses 0.05/6. The cornerback cut (n = 20) moves the same way when 2025 is dropped.
-- Multiple comparisons. Six tests share one threshold, and A1-A6 were written after the first run. Only retention clears it. The cornerback filter, man/zone shrinkage, and the threat model are exploratory.
-- Zone EPA is completely pooled (tau^2 = 0). Shrunk zone EPA does not separate corners, and no shrunk-EPA interval lies entirely above or below zero.
-- Threat-model probabilities are miscalibrated in the tails (bin 1: 0.21 predicted, 0.45 observed; bin 10: 0.85 against 0.73).
-- Only draftees are tracked, so a credited DB is an assigned draftee near the target, not a charted primary defender. Opponent, scheme, throw quality, drops, and injury are unadjusted. Shrinkage intervals treat the prior as known.
-- The break is a definition, not an official NGS event, and 2024 recordings are shorter.
+A DB coach should train the turn, not only the stopwatch to the plant. The backs who hold speed through the break give up less offense, and in man that is about 0.6 expected points per target. The rep is to stay in phase at the stem break so the receiver does not get a step. The same idea shows up when the ball is released. An extra yard of separation at the throw is worth about 10 completion points here, and a corner who is closing that gap takes completions off the board. A longer wing span, a better broad jump, or a better vertical does not, once the tracking at the throw is known.
 
-## Reproducibility
+A coordinator should weight this more in a man-heavy plan than in a zone plan. The retention result is clear on man targets and unclear on zone targets. In zone, these corners do not separate from each other once noisy averages are pulled together.
 
-The notebook calls `bdb2027.pipeline.run_analysis` on `/kaggle/input/nfl-big-data-bowl-2027/` and rebuilds Tables 1-3 and Figures 1-2. Figure 3 comes from `run_cb_exploratory` in "Exploratory cornerbacks" and is still a placeholder here. Definitions and amendments are in `src/bdb2027/preregistration.py`.
+Prefer it for corners. Twenty of the 26 backs in the lead are corners, and the corner-only result is essentially the same correlation. There are not enough safeties here to say the drill means the same thing for them.
+
+## Limits
+
+- The lead is 26 players. Drop 2025, or require 10 credited targets, and the interval includes no effect. Dropping 2024 still points the same way but misses the six-test bar.
+- Six tests shared one correction, and the definitions changed after the first run. Only speed through the break passes. The man-versus-zone look and the completion model were not in those six.
+- In zone, the adjusted EPA does not separate corners. No corner's range sits entirely above or below zero.
+- The completion probabilities are off at the extremes.
+- Only draftees are tracked. The credited back is the closest assigned draftee within 5 yards, not a charted primary defender. Opponent, scheme, throw quality, and drops are not adjusted.
+- The break is our definition, not an official event, and the 2024 drill tapes are short.
+
+The notebook rebuilds the tables and figures. The checks left out of Table 2, the full scenario ranges, and the calibration bins are there.
 
 <!-- SUBMISSION END -->
 
@@ -145,6 +131,7 @@ The notebook calls `bdb2027.pipeline.run_analysis` on `/kaggle/input/nfl-big-dat
 
 ### Rules reminders
 
+- Track: University, solo author. Leave the Grand Prize track empty.
 - At or under 2,000 words, fewer than 10 tables or figures, attached public notebook. Part A has 3 tables and 3 figures.
 - The write-up has to use Combine tracking and link it to regular-season performance. Both gates rest on the backpedal drill series and regular-season `player_play` outcomes.
 - Do not attach or quote row-level competition data. Tables 1-3 are aggregates. Figure 3 panel A is one point per player and stays inside the notebook.
@@ -159,6 +146,18 @@ The DB tests still pool CB, SS, FS, DB, and S. The exploratory pass keeps `nfl_p
 The cornerback-only retention correlation (r = -0.640, n = 20) is a position filter of the 26-player lead (20 CB and 6 SS). It is not a row in `effects_robustness.csv`, and the notebook's robustness table does not print it. Safeties alone were too few. Year drops for that filter: without 2024, r = -0.766, p = 0.013, n = 10; without 2025, r = -0.384, the interval crosses zero, p = 0.18, n = 15.
 
 A threat is a completion on the credited target. The model is penalized logistic regression with a player intercept, using pre-throw tracking (speed, acceleration magnitude, hip and motion error relative to the receiver, closing speed, speed change over 0.5 s) plus wing span, broad jump, and vertical. Frames after `pass_forward`, and post-outcome event names, are dropped. Run it with `--cb-exploratory`. The player-level coverage table (`effects_cb_coverage.csv`) is not for the write-up or for git. Read `README.md` for the file list, the label map, and the limits.
+
+### Detail moved out of Part A
+
+Part A keeps the main retention row, the three year drops, the 10-target floor, and the man/zone split. The notebook prints the rest of `effects_robustness.csv`. Those rows, from the 2026-11-25 run:
+
+- Within-class Spearman: r = -0.544, interval -0.782 to -0.168, n = 26.
+- Bootstrap, 2,000 within-class resamples: r = -0.596, interval -0.861 to -0.292.
+- Drop any one player: r stays between -0.707 and -0.521.
+
+Fisher intervals use `1 / sqrt(n - 3 - (k - 1))` for k draft classes. The two break-time tests are within-class Spearman with variance factor 1.06, because attempts with no break by 5.5 s are censored and tied at the slowest rank. Scenario probabilities the write-up rounds to "two in three" and "one in three" are 0.681 (0.555 to 0.837) and 0.336 (0.163 to 0.480) for all targets. Man: 0.688 (0.538 to 0.854) and 0.246 (0.085 to 0.426). Zone: 0.578 (0.435 to 0.746) and 0.433 (0.305 to 0.547). P(slope below zero) is 1.000, 0.998, and 0.924. Observed-volume gap: -1.60 expected points (-2.44 to -0.88) at a median of 5 credited targets.
+
+Completion-chance changes in Part A are `mean_risk_difference` from the threat effects file, the average change in predicted completion probability when that feature rises by 1 SD (`threat.py`, `_risk_difference`). Separation SD is 1.264 yards (mean 2.502), so 0.128 / 1.264 = 0.101, about 10 points per yard. Closing-speed SD is 2.268 yards per second, times 3600/1760 = 4.64 mph. The per-yard-per-second figure is -0.0674 / 2.268 = -0.030, about 3 points. Acceleration stays per 1 SD (0.060, interval 0.007 to 0.113) because the code names `a` as acceleration magnitude and does not convert it. Calibration bins stay in the notebook: bin 1 predicted 0.208 vs observed 0.449; bin 10 predicted 0.845 vs observed 0.729. Brier 0.239 vs 0.250. Log loss 0.678 vs 0.694. ECE 0.064.
 
 ### Before submitting
 
