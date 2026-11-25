@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from bdb2027.schema import (
@@ -229,4 +230,93 @@ def load_pass_forward_tracking(
             frames.append(frame)
     if not frames:
         return pd.DataFrame(columns=list(GAME_TRACKING_REQUIRED))
+    return pd.concat(frames, ignore_index=True)
+
+
+def load_combine_traits(data_dir: Path) -> pd.DataFrame:
+    """Wing span, broad jump, and vertical. Used by the exploratory threat model."""
+    from bdb2027.schema import COMBINE_TRAITS_COLUMNS
+
+    return read_csv_columns(Path(data_dir) / "combine_results.csv", COMBINE_TRAITS_COLUMNS)
+
+
+def load_play_shell(data_dir: Path, *, chunksize: int = DEFAULT_CHUNK_ROWS) -> pd.DataFrame:
+    """One row per play with the team man/zone shell.
+
+    `player_play.csv` repeats the shell on every player row. The first non-null
+    value on the play is kept. This is the audit column for the CB coverage
+    table, not the label that table splits on.
+    """
+    from bdb2027.schema import PLAYER_PLAY_SHELL_COLUMNS
+
+    frame = read_csv_columns(
+        Path(data_dir) / "player_play.csv",
+        PLAYER_PLAY_SHELL_COLUMNS,
+        chunksize=chunksize,
+    )
+    columns = ["game_id", "play_id", "team_coverage_man_zone"]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+    work = frame.copy()
+    shell = work["team_coverage_man_zone"].astype("string").str.strip().str.upper()
+    shell = shell.mask(shell.isin(["<NA>", "NAN", "NONE", ""]))
+    work["team_coverage_man_zone"] = shell
+    work["_game_id"] = pd.to_numeric(work["game_id"], errors="coerce")
+    work["_play_id"] = pd.to_numeric(work["play_id"], errors="coerce")
+    work = work.dropna(subset=["_game_id", "_play_id"])
+    work = work.sort_values(["_game_id", "_play_id"], kind="mergesort")
+    # Prefer a non-null shell when any player row on the play has one.
+    work["_missing"] = work["team_coverage_man_zone"].isna()
+    work = work.sort_values(["_game_id", "_play_id", "_missing"], kind="mergesort")
+    kept = work.drop_duplicates(["_game_id", "_play_id"], keep="first")
+    return pd.DataFrame(
+        {
+            "game_id": kept["_game_id"].astype(np.int64).to_numpy(),
+            "play_id": kept["_play_id"].astype(np.int64).to_numpy(),
+            "team_coverage_man_zone": kept["team_coverage_man_zone"].to_numpy(),
+        }
+    )
+
+
+def load_play_kinematics(
+    data_dir: Path,
+    play_keys: set[tuple[int, int]],
+    *,
+    chunksize: int = DEFAULT_CHUNK_ROWS,
+) -> pd.DataFrame:
+    """Load tracking frames for the given plays from all three season files.
+
+    The caller drops post-throw frames. This reader only restricts the files
+    to the requested plays and to the kinematic columns.
+    """
+    from bdb2027.schema import GAME_TRACKING_KINEMATICS
+
+    columns = list(GAME_TRACKING_KINEMATICS)
+    if not play_keys:
+        return pd.DataFrame(columns=columns)
+    wanted = pd.DataFrame(list(play_keys), columns=["_game_id", "_play_id"])
+    wanted["_game_id"] = wanted["_game_id"].astype(np.int64)
+    wanted["_play_id"] = wanted["_play_id"].astype(np.int64)
+
+    def keep(chunk: pd.DataFrame) -> pd.DataFrame:
+        work = chunk.copy()
+        work["_game_id"] = pd.to_numeric(work["game_id"], errors="coerce")
+        work["_play_id"] = pd.to_numeric(work["play_id"], errors="coerce")
+        work = work.dropna(subset=["_game_id", "_play_id"])
+        if work.empty:
+            return work.drop(columns=["_game_id", "_play_id"], errors="ignore")
+        work["_game_id"] = work["_game_id"].astype(np.int64)
+        work["_play_id"] = work["_play_id"].astype(np.int64)
+        kept = work.merge(wanted, on=["_game_id", "_play_id"], how="inner")
+        return kept.drop(columns=["_game_id", "_play_id"])
+
+    data_dir = Path(data_dir)
+    frames: list[pd.DataFrame] = []
+    for year in (2023, 2024, 2025):
+        path = data_dir / f"game_tracking_{year}.csv"
+        frame = read_csv_columns(path, columns, chunksize=chunksize, predicate=keep)
+        if not frame.empty:
+            frames.append(frame)
+    if not frames:
+        return pd.DataFrame(columns=columns)
     return pd.concat(frames, ignore_index=True)

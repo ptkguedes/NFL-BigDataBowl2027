@@ -74,18 +74,75 @@ Runtime dependencies are `numpy` and `pandas` (`requirements.txt`). Development 
 
 The command writes `outputs/effects.csv`. It does not write a submission CSV. If `data/` is missing files, it exits with status 1 and names the missing files.
 
+Cornerback man/zone tables and the threat model are a separate, exploratory pass. They do not change the six-test family:
+
+```bash
+.venv/bin/python -m bdb2027 --data-dir data --output outputs/effects.csv --cb-exploratory
+```
+
+`--cb-bootstrap-draws` sets the cluster bootstrap for the threat-model intervals (default 200). The pass needs `wing_span`, `broad_jump`, and `vertical` on `combine_results.csv`, `team_coverage_man_zone` on `player_play.csv`, and `time`, `s`, `a`, `o`, and `dir` on the game-tracking files. Details are in the next section.
+
 The Kaggle notebook skeleton is `notebooks/bdb2027_combine_to_nfl.ipynb`.
 
 ## Layout
 
 ```text
-src/bdb2027/          column-selective loaders, drill features, outcomes, linkage
+src/bdb2027/          loaders, drill features, outcomes, linkage, exploratory CB analyses
 notebooks/            Kaggle notebook skeleton
 tests/                synthetic fixtures and unit tests only
 docs/RULES_CHECKLIST.md
 docs/WRITEUP_DRAFT.md
 .github/workflows/ci.yml
 ```
+
+## Exploratory cornerbacks
+
+Not pre-registered. The DB tests still pool CB, SS, FS, DB, and S. This pass keeps `nfl_position == CB` only, on the same regular-season games and the same coverage-credit rule (an opposing draftee with an active assignment, closest at `pass_forward`, within 5 yards). Safeties stay in the original tests and out of these tables.
+
+### Man and zone
+
+The split is the corner's own `coverage_assignment`, not `team_coverage_man_zone`.
+
+The assignment is the job that corner was given on the play. The team column is the defensive shell, and it is the same for every defender on that play. A Cover-1 shell is man with a deep zone behind it. A Cover-3 shell is zone, and the two corners are not doing the same job. The credit rule already requires an active `coverage_assignment`, so the split uses that same column. The team shell is written only as an agreement audit.
+
+A token that contains MAN and not a zone word is man (`MAN`, `MAN_MATCH`, `2_MAN`). A token that contains a zone word and not MAN is zone (`ZONE`, `DEEP_FREE`, `CURL_FLAT_LEFT`, and the same family: FLAT, HOOK, SEAM, QUARTER, HALF, THIRD, BRACKET, PALM). A token that names both, or neither (`MAN_ZONE`, `COVER_3`, `NO_ASSIGNMENT`), is `other` and is left out of the man and zone rows. The older retention robustness check is a different rule, exact `MAN` versus everything else, and it is unchanged.
+
+The table has one row per CB and coverage type with at least one credited target. It reports targets, completion rate allowed, EPA allowed, and separation allowed. Each cell has the raw mean and an empirical-Bayes shrinkage estimate. Completion uses a beta-binomial model. EPA and separation use a normal-normal model with a DerSimonian-Laird between-CB variance. The 95% intervals plug those hyperparameters in, so they do not include uncertainty about the prior itself. A row with fewer than 5 targets is flagged `meets_floor=False`. `small_n` is set below 20 targets, the same threshold as the pre-registered tables. The figure draws shrunk EPA for rows that meet the floor.
+
+### Threat probability
+
+A credited matchup is a threat when the targeted receiver's `pass_result` is `C`. Completion is the event the rep is asked to prevent, and it is recorded after the throw. Positive EPA was set aside because it mixes yards after the catch. A separation cutoff at the catch was set aside because that frame is after the throw and restates the tracking geometry.
+
+The model is an L2-penalized logistic regression with a normal player intercept per CB. Slopes are log-odds per 1 SD of the estimation sample, and the table also reports the mean change in completion probability for a 1 SD increase. The penalty is chosen by grouped cross-validation that scores held-out corners with their intercept set to zero. Combine traits do not vary within a CB, so an unpenalized intercept would swallow wing span, broad jump, and vertical. Scoring a held-out corner at a zero intercept keeps trait coefficients that predict someone the fit did not see. Intervals are percentile intervals from a cluster bootstrap that resamples corners and refits at that fixed penalty. They are blank when fewer than 20 bootstrap fits succeed. Calibration (Brier, log loss, reliability bins, ECE) is the grouped cross-validation, compared with an intercept-only model on the same folds.
+
+Features, all known at or before the throw:
+
+- separation between the CB and the credited receiver at `pass_forward`
+- closing speed, positive when that gap is shrinking (NGS direction: 0 degrees is +y, 90 degrees is +x)
+- hip error, the angle between orientation `o` and the bearing to the receiver
+- motion error, the same angle for direction of travel `dir`
+- CB speed `s` and acceleration magnitude `a` (the files do not sign `a`)
+- change in CB speed from about 0.5 seconds before the throw
+- Combine `wing_span`, `broad_jump`, and `vertical`
+
+Height, weight, and arm length stay out so wing span is not split with arm length.
+
+Plays with no `pass_forward` timestamp are dropped. Event names that record the result of the throw (`pass_outcome_*`, `pass_arrived`, tackle, touchdown, and the same family) are dropped. Every other frame is kept only at or before `pass_forward`.
+
+### Files
+
+`--cb-exploratory` writes:
+
+- `outputs/effects_cb_coverage.csv` — the player-level man/zone table. Do not commit it.
+- `outputs/effects_cb_coverage_audit.csv` — assignment strings, the man/zone/other label, and agreement with the team shell. No player ids.
+- `outputs/effects_cb_coverage_summary.csv` — the label choice, the floor, and the agreement rate.
+- `outputs/effects_cb_threat_effects.csv` — coefficients, odds ratios, and probability differences, with intervals.
+- `outputs/effects_cb_threat_calibration.csv` — grouped-CV reliability bins.
+- `outputs/effects_cb_threat_metrics.csv` — Brier, log loss, ECE, sample size, and the threat definition.
+
+The notebook section "Exploratory cornerbacks" draws the two figures with `bdb2027.figures.figure_cb_coverage` and `figure_threat_effects`. Like Figure 1, the coverage figure has one point per player. Do not export it outside Kaggle.
+
+Limits to keep in mind: the credit rule still sees only draftee-on-draftee targets, the per-CB samples are small, the intervals treat the shrinkage prior as known, and nothing here adjusts for opponent, throw quality, or drops. It is not one of the six pre-registered tests.
 
 ## Tests
 

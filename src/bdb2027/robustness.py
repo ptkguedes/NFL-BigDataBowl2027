@@ -152,7 +152,12 @@ def coverage_split(
     predictor: str = PREDICTOR,
     outcome: str = OUTCOME,
 ) -> list[dict[str, object]]:
-    """Recompute EPA allowed from man-only and zone-only credited targets."""
+    """Recompute EPA allowed from man-only and zone-only credited targets.
+
+    This robustness check stays an exact ``MAN`` versus everything-else split
+    on the credited assignment. The exploratory per-CB table in
+    ``cb_coverage`` uses a stricter man/zone/other map and is not this check.
+    """
     rows = []
     if assignments.empty or "coverage_assignment" not in assignments.columns:
         return rows

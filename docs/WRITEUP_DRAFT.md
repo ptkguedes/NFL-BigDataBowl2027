@@ -120,6 +120,14 @@ The public Kaggle notebook calls `bdb2027.pipeline.run_analysis` on `/kaggle/inp
 - Do not attach or quote row-level competition data. Tables 1-2 are aggregates.
 - Optional external benchmark (Madden or other ratings): include it only if the source is public and free for every participant, or meets the host's Reasonableness Standard (Rules section 2.6). It is off by default (`--enable-external-benchmark`), it is not part of the family, and it would cost a figure.
 
+### Exploratory cornerbacks (not in Part A)
+
+`src/bdb2027/cb_coverage.py` and `src/bdb2027/threat.py` are not part of the pre-registered family. Part A does not mention them. Adding them to the submission would spend figures and would present work that was not in the family of six.
+
+The DB tests still pool CB, SS, FS, DB, and S. The new pass keeps `nfl_position == CB`. Man versus zone uses the corner's `coverage_assignment`. `team_coverage_man_zone` is the shell for every defender on the play, so it is an agreement audit only. Strings that are neither man nor zone stay out of the rows. Each CB-coverage cell has a raw mean and an empirical-Bayes interval (beta-binomial for completion rate, normal-normal for EPA and separation). The floor is 5 credited targets in that coverage. The figure is `figure_cb_coverage`.
+
+A threat is a completion on the credited target. The model is penalized logistic regression with a player intercept, using pre-throw tracking (speed, acceleration magnitude, hip and motion error relative to the receiver, closing speed, speed change over 0.5 s) plus wing span, broad jump, and vertical. Frames after `pass_forward`, and post-outcome event names, are dropped. Run it with `--cb-exploratory`. The player-level coverage table is not for the write-up or for git. Read `README.md` for the file list, the label map, and the limits.
+
 ### Before submitting
 
 1. Re-run with `--robustness --scenarios` and replace every number in Part A.
